@@ -238,6 +238,18 @@ struct BucketedMetricSeries: Codable, Hashable, Identifiable, Sendable {
     var buckets: [MetricBucket]
     var rangeStart: Date?
     var rangeEnd: Date?
+
+    var displayTitle: String {
+        type == .activeMinutes ? "Activity Intensity" : title
+    }
+
+    var displayBuckets: [MetricBucket] {
+        let aggregated = aggregateBuckets(buckets)
+        guard type == .activeMinutes else {
+            return aggregated
+        }
+        return orderedBuckets(aggregated, labels: ["Light", "Moderate", "Vigorous"])
+    }
 }
 
 struct ActivityDashboardData: Codable, Equatable, Sendable {
@@ -256,6 +268,12 @@ struct ActivityDashboardData: Codable, Equatable, Sendable {
     func series(for type: GoogleHealthDataType) -> NumericMetricSeries? {
         dailySeries.first { $0.type == type }
             ?? hourlySeries.first { $0.type == type }
+    }
+
+    var isEmpty: Bool {
+        !dailySeries.containsVisiblePoints
+            && !hourlySeries.containsVisiblePoints
+            && bucketedSeries.isEmpty
     }
 
     mutating func mergeEarlier(_ earlier: NumericMetricSeries) {
@@ -352,6 +370,14 @@ struct SleepSession: Codable, Equatable, Identifiable, Sendable {
     }
 }
 
+enum HealthDashboardMetricGroup: String, CaseIterable, Codable, Hashable, Sendable {
+    case heart
+    case sleepMetrics
+    case vitals
+    case cardioFitness
+    case body
+}
+
 struct HealthDashboardData: Codable, Equatable, Sendable {
     var heartSeries: [NumericMetricSeries]
     var sleepMetricSeries: [NumericMetricSeries]
@@ -377,6 +403,20 @@ struct HealthDashboardData: Codable, Equatable, Sendable {
 
     func series(for type: GoogleHealthDataType) -> NumericMetricSeries? {
         allSeries.first { $0.type == type }
+    }
+
+    var visibleMetricGroups: [HealthDashboardMetricGroup] {
+        var groups: [HealthDashboardMetricGroup] = []
+        if heartSeries.containsVisiblePoints { groups.append(.heart) }
+        if sleepMetricSeries.containsVisiblePoints { groups.append(.sleepMetrics) }
+        if vitalSeries.containsVisiblePoints { groups.append(.vitals) }
+        if cardioFitnessSeries.containsVisiblePoints { groups.append(.cardioFitness) }
+        if bodySeries.containsVisiblePoints { groups.append(.body) }
+        return groups
+    }
+
+    var isEmpty: Bool {
+        sleepSessions.isEmpty && visibleMetricGroups.isEmpty
     }
 
     mutating func mergeEarlier(_ earlier: NumericMetricSeries) {
@@ -507,6 +547,10 @@ extension WorkoutDetail {
 }
 
 private extension Array where Element == NumericMetricSeries {
+    var containsVisiblePoints: Bool {
+        contains { !$0.points.isEmpty }
+    }
+
     mutating func merge(_ earlier: NumericMetricSeries) {
         guard let index = firstIndex(where: { $0.type == earlier.type }) else {
             append(earlier)
@@ -514,4 +558,58 @@ private extension Array where Element == NumericMetricSeries {
         }
         self[index] = self[index].mergingEarlier(earlier)
     }
+}
+
+private func aggregateBuckets(_ buckets: [MetricBucket]) -> [MetricBucket] {
+    var orderedKeys: [String] = []
+    var bucketsByKey: [String: MetricBucket] = [:]
+
+    for bucket in buckets {
+        let label = displayBucketLabel(bucket.label)
+        let key = normalizedBucketKey(label)
+        let normalizedBucket = MetricBucket(label: label, value: bucket.value, unit: bucket.unit)
+
+        if var existing = bucketsByKey[key] {
+            existing.value += normalizedBucket.value
+            bucketsByKey[key] = existing
+        } else {
+            orderedKeys.append(key)
+            bucketsByKey[key] = normalizedBucket
+        }
+    }
+
+    return orderedKeys.compactMap { bucketsByKey[$0] }
+}
+
+private func orderedBuckets(_ buckets: [MetricBucket], labels: [String]) -> [MetricBucket] {
+    let orderedKeys = labels.map(normalizedBucketKey)
+    return buckets.sorted { left, right in
+        let leftIndex = orderedKeys.firstIndex(of: normalizedBucketKey(left.label)) ?? orderedKeys.count
+        let rightIndex = orderedKeys.firstIndex(of: normalizedBucketKey(right.label)) ?? orderedKeys.count
+        guard leftIndex != rightIndex else {
+            return left.label < right.label
+        }
+        return leftIndex < rightIndex
+    }
+}
+
+private func displayBucketLabel(_ value: String) -> String {
+    switch normalizedBucketKey(value) {
+    case "LIGHT", "LIGHTLY_ACTIVE":
+        return "Light"
+    case "MODERATE", "MODERATELY_ACTIVE":
+        return "Moderate"
+    case "VIGOROUS", "VERY_ACTIVE":
+        return "Vigorous"
+    default:
+        return value.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+}
+
+private func normalizedBucketKey(_ value: String) -> String {
+    value
+        .trimmingCharacters(in: .whitespacesAndNewlines)
+        .uppercased()
+        .replacingOccurrences(of: " ", with: "_")
+        .replacingOccurrences(of: "-", with: "_")
 }

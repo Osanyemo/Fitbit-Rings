@@ -58,6 +58,10 @@ struct ActivitySummary: Equatable, Sendable {
     var totalCalories: Double
     var providedMetrics: Set<GoogleHealthDataType> = []
 
+    var hasAnyData: Bool {
+        !providedMetrics.isEmpty
+    }
+
     func hasData(for type: GoogleHealthDataType) -> Bool {
         providedMetrics.contains(type)
     }

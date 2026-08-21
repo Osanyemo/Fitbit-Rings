@@ -262,6 +262,119 @@ final class DashboardTests: XCTestCase {
         XCTAssertEqual(store.snapshot.summary.lastUpdated, .distantPast)
     }
 
+    func testHealthDashboardVisibilityHidesEmptyGroups() {
+        let health = HealthDashboardData.empty
+
+        XCTAssertTrue(health.isEmpty)
+        XCTAssertEqual(health.visibleMetricGroups, [])
+    }
+
+    func testHealthDashboardVisibilityKeepsSleepSessionsAsContent() {
+        var health = HealthDashboardData.empty
+        health.sleepSessions = [
+            SleepSession(
+                id: "sleep",
+                startTime: Date(timeIntervalSince1970: 0),
+                endTime: Date(timeIntervalSince1970: 3_600),
+                durationSeconds: 3_600,
+                stages: []
+            )
+        ]
+
+        XCTAssertFalse(health.isEmpty)
+        XCTAssertEqual(health.visibleMetricGroups, [])
+    }
+
+    func testHealthDashboardVisibilityIncludesPopulatedMetricGroups() {
+        let date = Date(timeIntervalSince1970: 1_000)
+        let point = NumericMetricPoint(id: "point", startDate: date, value: 1, unit: "")
+        let health = HealthDashboardData(
+            heartSeries: [NumericMetricSeries(type: .heartRate, points: [point])],
+            sleepMetricSeries: [NumericMetricSeries(type: .dailySleepTemperatureDerivations, points: [point])],
+            vitalSeries: [NumericMetricSeries(type: .dailyRespiratoryRate, points: [point])],
+            cardioFitnessSeries: [NumericMetricSeries(type: .dailyVo2Max, points: [point])],
+            bodySeries: [NumericMetricSeries(type: .weight, points: [point])],
+            sleepSessions: [],
+            loadedAt: date
+        )
+
+        XCTAssertFalse(health.isEmpty)
+        XCTAssertEqual(
+            health.visibleMetricGroups,
+            [.heart, .sleepMetrics, .vitals, .cardioFitness, .body]
+        )
+    }
+
+    func testBucketedMetricSeriesDisplayCollapsesCachedDuplicateIntensityRows() {
+        let series = BucketedMetricSeries(
+            type: .activeMinutes,
+            title: "Activity Level",
+            buckets: [
+                MetricBucket(label: "Light", value: 120, unit: "min"),
+                MetricBucket(label: "Moderate", value: 62, unit: "min"),
+                MetricBucket(label: "Vigorous", value: 72, unit: "min"),
+                MetricBucket(label: "Light", value: 98, unit: "min"),
+                MetricBucket(label: " moderately-active ", value: 20, unit: "min"),
+                MetricBucket(label: "VERY_ACTIVE", value: 51, unit: "min")
+            ],
+            rangeStart: nil,
+            rangeEnd: nil
+        )
+
+        XCTAssertEqual(series.displayTitle, "Activity Intensity")
+        XCTAssertEqual(series.displayBuckets.map(\.label), ["Light", "Moderate", "Vigorous"])
+        XCTAssertEqual(series.displayBuckets.map(\.value), [218, 82, 123])
+    }
+
+    @MainActor
+    func testRefreshSummarySeedsMeasuredHeartRateIntoHealthSeries() async throws {
+        let measuredAt = Date(timeIntervalSince1970: 1_500)
+        var summary = dashboardSnapshot(steps: 1_234, lastUpdated: measuredAt)
+        summary.heart = HeartSummary(
+            mostRecentHeartRate: 72,
+            restingHeartRate: 58,
+            measuredAt: measuredAt
+        )
+        let cache = InMemoryDashboardCache()
+        let repository = DashboardRepository(
+            googleHealthClient: StubGoogleHealthClient(response: .success(summary)),
+            cache: cache
+        )
+
+        let snapshot = try await repository.refreshSummary(
+            preserving: .empty(goals: .defaultGoals),
+            date: measuredAt
+        )
+
+        let heartSeries = try XCTUnwrap(snapshot.health.series(for: .heartRate))
+        XCTAssertEqual(heartSeries.latestPoint?.value, 72)
+        XCTAssertEqual(heartSeries.latestPoint?.startDate, measuredAt)
+        XCTAssertNil(snapshot.health.series(for: .dailyRestingHeartRate))
+    }
+
+    @MainActor
+    func testRefreshSummaryDoesNotSeedHeartRateWithoutMeasurementTime() async throws {
+        let date = Date(timeIntervalSince1970: 1_500)
+        var summary = dashboardSnapshot(steps: 1_234, lastUpdated: date)
+        summary.heart = HeartSummary(
+            mostRecentHeartRate: 72,
+            restingHeartRate: nil,
+            measuredAt: nil
+        )
+        let cache = InMemoryDashboardCache()
+        let repository = DashboardRepository(
+            googleHealthClient: StubGoogleHealthClient(response: .success(summary)),
+            cache: cache
+        )
+
+        let snapshot = try await repository.refreshSummary(
+            preserving: .empty(goals: .defaultGoals),
+            date: date
+        )
+
+        XCTAssertTrue(snapshot.health.heartSeries.isEmpty)
+    }
+
     func testCompactUpdateFormatting() {
         let now = Date(timeIntervalSince1970: 10_000)
 

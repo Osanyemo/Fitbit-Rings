@@ -70,6 +70,24 @@ struct DashboardRepository {
                 at: 0
             )
         }
+        if let heartRate = summary.heart.mostRecentHeartRate,
+           let measuredAt = summary.heart.measuredAt {
+            snapshot.health.mergeEarlier(
+                NumericMetricSeries(
+                    type: .heartRate,
+                    points: [
+                        NumericMetricPoint(
+                            id: "summary-heart-rate-\(measuredAt.timeIntervalSince1970)",
+                            startDate: measuredAt,
+                            value: Double(heartRate),
+                            unit: GoogleHealthDataType.heartRate.unit
+                        )
+                    ],
+                    rangeStart: measuredAt,
+                    rangeEnd: measuredAt
+                )
+            )
+        }
         snapshot.lastUpdated = summary.lastUpdated
         cache.saveFitnessData(snapshot)
         return snapshot

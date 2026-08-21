@@ -179,6 +179,10 @@ final class GoogleHealthDecodingTests: XCTestCase {
                                     GoogleHealthActiveMinutesByActivityLevel(
                                         activityLevel: "MODERATE",
                                         activeMinutesSum: GoogleHealthNumericValue(5)
+                                    ),
+                                    GoogleHealthActiveMinutesByActivityLevel(
+                                        activityLevel: "VIGOROUS",
+                                        activeMinutesSum: GoogleHealthNumericValue(3)
                                     )
                                 ]
                             )
@@ -187,12 +191,16 @@ final class GoogleHealthDecodingTests: XCTestCase {
                             activeMinutes: GoogleHealthActiveMinutesRollup(
                                 activeMinutesRollupByActivityLevel: [
                                     GoogleHealthActiveMinutesByActivityLevel(
-                                        activityLevel: "LIGHT",
+                                        activityLevel: " lightly_active ",
                                         activeMinutesSum: GoogleHealthNumericValue(7)
                                     ),
                                     GoogleHealthActiveMinutesByActivityLevel(
-                                        activityLevel: "VIGOROUS",
-                                        activeMinutesSum: GoogleHealthNumericValue(3)
+                                        activityLevel: "MODERATELY_ACTIVE",
+                                        activeMinutesSum: GoogleHealthNumericValue(11)
+                                    ),
+                                    GoogleHealthActiveMinutesByActivityLevel(
+                                        activityLevel: "VERY_ACTIVE",
+                                        activeMinutesSum: GoogleHealthNumericValue(13)
                                     )
                                 ]
                             )
@@ -206,8 +214,88 @@ final class GoogleHealthDecodingTests: XCTestCase {
         )
 
         let activityLevel = try XCTUnwrap(activityData.bucketedSeries.first { $0.type == .activeMinutes })
+        XCTAssertEqual(activityLevel.title, "Activity Intensity")
         XCTAssertEqual(activityLevel.buckets.map(\.label), ["Light", "Moderate", "Vigorous"])
-        XCTAssertEqual(activityLevel.buckets.map(\.value), [17, 5, 3])
+        XCTAssertEqual(activityLevel.buckets.map(\.value), [17, 16, 16])
+    }
+
+    func testActivityMapperHidesEmptyRollupsButKeepsExplicitZeroPoints() throws {
+        let date = Date(timeIntervalSince1970: 0)
+        let activityData = GoogleHealthMapper.mapActivityData(
+            dailyRollups: [
+                .steps: GoogleHealthRollUpResponse(rollupDataPoints: []),
+                .floors: GoogleHealthRollUpResponse(
+                    rollupDataPoints: [
+                        GoogleHealthRollupDataPoint(
+                            floors: GoogleHealthCountRollup(
+                                countSum: GoogleHealthNumericValue(0),
+                                floorsSum: nil,
+                                lengthsSum: nil
+                            )
+                        )
+                    ]
+                )
+            ],
+            hourlyRollups: [:],
+            range: DateInterval(start: date, duration: 14 * 86_400),
+            loadedAt: date
+        )
+
+        XCTAssertNil(activityData.series(for: .steps))
+
+        let floors = try XCTUnwrap(activityData.series(for: .floors))
+        XCTAssertEqual(floors.points.map(\.value), [0])
+        XCTAssertFalse(activityData.isEmpty)
+    }
+
+    func testActivityMapperDecodesAndMapsSupportedRollupMetrics() throws {
+        let json = """
+        {
+          "rollupDataPoints": [
+            {
+              "activeZoneMinutes": {
+                "fatBurnMinutesSum": "2",
+                "cardioMinutesSum": "3",
+                "peakMinutesSum": "4"
+              },
+              "floors": { "floorsSum": "6" },
+              "swimLengthsData": { "lengthsSum": "8" },
+              "caloriesInHeartRateZone": { "caloriesKcalSum": "120" },
+              "timeInHeartRateZone": { "minutesSum": "24" }
+            }
+          ]
+        }
+        """.data(using: .utf8)!
+
+        let decoded = try JSONDecoder.googleHealthDecoder.decode(
+            GoogleHealthRollUpResponse.self,
+            from: json
+        )
+        let point = try XCTUnwrap(decoded.rollupDataPoints.first)
+
+        XCTAssertEqual(point.activeZoneMinutes?.fatBurnMinutesSum?.intValue, 2)
+        XCTAssertEqual(point.floors?.floorsSum?.intValue, 6)
+        XCTAssertEqual(point.swimLengthsData?.lengthsSum?.intValue, 8)
+        XCTAssertEqual(point.caloriesInHeartRateZone?.caloriesKcalSum?.intValue, 120)
+        XCTAssertEqual(point.timeInHeartRateZone?.minutesSum?.intValue, 24)
+
+        let activityData = GoogleHealthMapper.mapActivityData(
+            dailyRollups: [
+                .activeZoneMinutes: decoded,
+                .floors: decoded,
+                .swimLengthsData: decoded,
+                .caloriesInHeartRateZone: decoded,
+                .timeInHeartRateZone: decoded
+            ],
+            hourlyRollups: [:],
+            range: DateInterval(start: Date(timeIntervalSince1970: 0), duration: 14 * 86_400)
+        )
+
+        XCTAssertEqual(try latestValue(.activeZoneMinutes, in: activityData), 9)
+        XCTAssertEqual(try latestValue(.floors, in: activityData), 6)
+        XCTAssertEqual(try latestValue(.swimLengthsData, in: activityData), 8)
+        XCTAssertEqual(try latestValue(.caloriesInHeartRateZone, in: activityData), 120)
+        XCTAssertEqual(try latestValue(.timeInHeartRateZone, in: activityData), 24)
     }
 
     func testDataPointResponseDecodesWorkoutRecord() throws {
@@ -391,6 +479,15 @@ final class GoogleHealthDecodingTests: XCTestCase {
         )?.queryItems
         XCTAssertEqual(secondItems?.first(named: "pageToken")?.value, "next-page")
     }
+}
+
+private func latestValue(
+    _ type: GoogleHealthDataType,
+    in activityData: ActivityDashboardData,
+    file: StaticString = #filePath,
+    line: UInt = #line
+) throws -> Double {
+    try XCTUnwrap(activityData.series(for: type)?.latestPoint?.value, file: file, line: line)
 }
 
 private final class CapturingHTTPClient: HTTPClient {

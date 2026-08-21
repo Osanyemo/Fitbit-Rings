@@ -148,28 +148,42 @@ private struct ActivityTabView: View {
             }
         ) {
             VStack(alignment: .leading, spacing: 24) {
-                ActivityTodayFocusSection(
-                    snapshot: store.snapshot.summary,
-                    onSelectMetric: { type in
-                        store.route(to: .metric(type))
+                if hasActivityContent {
+                    if store.snapshot.summary.activity.hasAnyData {
+                        ActivityTodayFocusSection(
+                            snapshot: store.snapshot.summary,
+                            onSelectMetric: { type in
+                                store.route(to: .metric(type))
+                            }
+                        )
                     }
-                )
 
-                DashboardSeriesSection(
-                    title: "14-Day Trends",
-                    series: store.snapshot.activity.dailySeries,
-                    units: store.preferences.units,
-                    onSelectMetric: { type in
-                        store.route(to: .metric(type))
+                    if store.snapshot.activity.dailySeries.contains(where: { !$0.points.isEmpty }) {
+                        DashboardSeriesSection(
+                            title: "14-Day Trends",
+                            series: store.snapshot.activity.dailySeries,
+                            units: store.preferences.units,
+                            onSelectMetric: { type in
+                                store.route(to: .metric(type))
+                            }
+                        )
                     }
-                )
 
-                BucketedSeriesSection(series: store.snapshot.activity.bucketedSeries)
+                    BucketedSeriesSection(series: store.snapshot.activity.bucketedSeries)
+                } else {
+                    DashboardEmptyState(title: "No activity data", systemImage: "figure.run.circle")
+                }
             }
         }
         .task {
             await store.loadIfNeeded(.activity)
         }
+    }
+
+    private var hasActivityContent: Bool {
+        store.snapshot.summary.activity.hasAnyData
+            || store.snapshot.activity.dailySeries.contains(where: { !$0.points.isEmpty })
+            || !store.snapshot.activity.bucketedSeries.isEmpty
     }
 }
 
@@ -216,45 +230,51 @@ private struct HealthTabView: View {
             }
         ) {
             VStack(alignment: .leading, spacing: 24) {
-                HealthMetricGroup(
-                    title: "Heart",
-                    series: store.snapshot.health.heartSeries,
-                    units: store.preferences.units,
-                    onSelectMetric: { store.route(to: .metric($0)) }
-                )
+                if store.snapshot.health.isEmpty {
+                    DashboardEmptyState(title: "No health data", systemImage: "heart.text.square")
+                } else {
+                    HealthMetricGroup(
+                        title: "Heart",
+                        series: store.snapshot.health.heartSeries,
+                        units: store.preferences.units,
+                        onSelectMetric: { store.route(to: .metric($0)) }
+                    )
 
-                SleepSessionsSection(
-                    sessions: store.snapshot.health.sleepSessions,
-                    onSelect: { store.route(to: .sleep($0.id)) }
-                )
+                    if !store.snapshot.health.sleepSessions.isEmpty {
+                        SleepSessionsSection(
+                            sessions: store.snapshot.health.sleepSessions,
+                            onSelect: { store.route(to: .sleep($0.id)) }
+                        )
+                    }
 
-                HealthMetricGroup(
-                    title: "Sleep",
-                    series: store.snapshot.health.sleepMetricSeries,
-                    units: store.preferences.units,
-                    onSelectMetric: { store.route(to: .metric($0)) }
-                )
+                    HealthMetricGroup(
+                        title: "Sleep Metrics",
+                        series: store.snapshot.health.sleepMetricSeries,
+                        units: store.preferences.units,
+                        onSelectMetric: { store.route(to: .metric($0)) }
+                    )
 
-                HealthMetricGroup(
-                    title: "Vitals",
-                    series: store.snapshot.health.vitalSeries,
-                    units: store.preferences.units,
-                    onSelectMetric: { store.route(to: .metric($0)) }
-                )
+                    HealthMetricGroup(
+                        title: "Vitals",
+                        series: store.snapshot.health.vitalSeries,
+                        units: store.preferences.units,
+                        onSelectMetric: { store.route(to: .metric($0)) }
+                    )
 
-                HealthMetricGroup(
-                    title: "Cardio Fitness",
-                    series: store.snapshot.health.cardioFitnessSeries,
-                    units: store.preferences.units,
-                    onSelectMetric: { store.route(to: .metric($0)) }
-                )
+                    HealthMetricGroup(
+                        title: "Cardio Fitness",
+                        series: store.snapshot.health.cardioFitnessSeries,
+                        units: store.preferences.units,
+                        onSelectMetric: { store.route(to: .metric($0)) }
+                    )
 
-                HealthMetricGroup(
-                    title: "Body",
-                    series: store.snapshot.health.bodySeries,
-                    units: store.preferences.units,
-                    onSelectMetric: { store.route(to: .metric($0)) }
-                )
+                    HealthMetricGroup(
+                        title: "Body",
+                        series: store.snapshot.health.bodySeries,
+                        units: store.preferences.units,
+                        onSelectMetric: { store.route(to: .metric($0)) }
+                    )
+                }
             }
         }
         .task {
@@ -901,16 +921,16 @@ private struct DashboardSeriesSection: View {
         GridItem(.flexible(), spacing: 14)
     ]
 
+    @ViewBuilder
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            Text(title)
-                .font(.title2.weight(.bold))
+        let visibleSeries = series.filter { !$0.points.isEmpty }
+        if !visibleSeries.isEmpty {
+            VStack(alignment: .leading, spacing: 14) {
+                Text(title)
+                    .font(.title2.weight(.bold))
 
-            if series.isEmpty {
-                DashboardEmptyState(title: "No data", systemImage: "chart.bar")
-            } else {
                 LazyVGrid(columns: columns, spacing: 14) {
-                    ForEach(series) { item in
+                    ForEach(visibleSeries) { item in
                         let latest = item.latestPoint
                         let metricValue = latest.map {
                             DashboardFormatting.metricValue($0.value, type: item.type, units: units)
@@ -941,13 +961,17 @@ private struct HealthMetricGroup: View {
     let units: UnitPreferences
     let onSelectMetric: (GoogleHealthDataType) -> Void
 
+    @ViewBuilder
     var body: some View {
-        DashboardSeriesSection(
-            title: title,
-            series: series,
-            units: units,
-            onSelectMetric: onSelectMetric
-        )
+        let visibleSeries = series.filter { !$0.points.isEmpty }
+        if !visibleSeries.isEmpty {
+            DashboardSeriesSection(
+                title: title,
+                series: visibleSeries,
+                units: units,
+                onSelectMetric: onSelectMetric
+            )
+        }
     }
 }
 
@@ -957,14 +981,81 @@ private struct BucketedSeriesSection: View {
     var body: some View {
         if !series.isEmpty {
             VStack(alignment: .leading, spacing: 14) {
-                Text("Breakdowns")
+                Text("Intensity")
                     .font(.title2.weight(.bold))
 
                 ForEach(series) { item in
-                    BucketList(title: item.title, buckets: item.buckets)
+                    BucketDistributionCard(series: item)
                 }
             }
         }
+    }
+}
+
+private struct BucketDistributionCard: View {
+    let series: BucketedMetricSeries
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .firstTextBaseline) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(series.displayTitle)
+                        .font(.headline.weight(.bold))
+
+                    Text(series.rangeSubtitle)
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer(minLength: 12)
+
+                Text(totalText)
+                    .font(.headline.weight(.bold).monospacedDigit())
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.78)
+            }
+
+            ForEach(series.displayBuckets) { bucket in
+                VStack(alignment: .leading, spacing: 7) {
+                    HStack {
+                        Text(bucket.label)
+                            .font(.subheadline.weight(.semibold))
+                        Spacer()
+                        Text("\(DashboardFormatting.integer(bucket.value)) \(bucket.unit)")
+                            .font(.subheadline.weight(.bold).monospacedDigit())
+                            .foregroundStyle(.secondary)
+                    }
+
+                    ProgressView(value: progress(for: bucket))
+                        .tint(series.type.accentColor)
+                }
+            }
+        }
+        .padding(16)
+        .background(.summarySurface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .stroke(.dashboardStroke, lineWidth: 1)
+        }
+    }
+
+    private var total: Double {
+        series.displayBuckets.reduce(0) { $0 + $1.value }
+    }
+
+    private var unit: String {
+        series.displayBuckets.first?.unit ?? ""
+    }
+
+    private var totalText: String {
+        let value = DashboardFormatting.integer(total)
+        return unit.isEmpty ? value : "\(value) \(unit)"
+    }
+
+    private func progress(for bucket: MetricBucket) -> Double {
+        guard total > 0 else { return 0 }
+        return min(max(bucket.value / total, 0), 1)
     }
 }
 
@@ -1258,6 +1349,15 @@ private struct DashboardScrollEdgeFade: View {
 }
 
 private extension NumericMetricSeries {
+    var rangeSubtitle: String {
+        guard let start = rangeStart, let end = rangeEnd else {
+            return "Last 14 days"
+        }
+        return "\(start.formatted(date: .abbreviated, time: .omitted)) - \(end.formatted(date: .abbreviated, time: .omitted))"
+    }
+}
+
+private extension BucketedMetricSeries {
     var rangeSubtitle: String {
         guard let start = rangeStart, let end = rangeEnd else {
             return "Last 14 days"
@@ -1609,7 +1709,7 @@ private extension FitnessDataSnapshot {
                 bucketedSeries: [
                     BucketedMetricSeries(
                         type: .activeMinutes,
-                        title: "Activity Level",
+                        title: "Activity Intensity",
                         buckets: [
                             MetricBucket(label: "Light", value: 22, unit: "min"),
                             MetricBucket(label: "Moderate", value: 11, unit: "min"),

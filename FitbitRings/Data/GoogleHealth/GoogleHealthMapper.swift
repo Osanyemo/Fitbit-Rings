@@ -85,12 +85,15 @@ enum GoogleHealthMapper {
                 fallbackRange: range
             )
         }
+        .filter { !$0.points.isEmpty }
+
         for type in GoogleHealthDataType.activityRecordSeriesTypes {
             let recordSeries = metricSeries(type, from: records[type] ?? [], range: range, calendar: calendar)
             if !recordSeries.points.isEmpty {
                 dailySeries.append(recordSeries)
             }
         }
+
         let hourlySeries = [GoogleHealthDataType.steps, .distance].compactMap { type in
             numericSeries(
                 type,
@@ -98,6 +101,8 @@ enum GoogleHealthMapper {
                 fallbackRange: nil
             )
         }
+        .filter { !$0.points.isEmpty }
+
         let bucketedSeries = bucketedSeries(from: dailyRollups, range: range)
 
         return ActivityDashboardData(
@@ -371,15 +376,15 @@ enum GoogleHealthMapper {
             .compactMap { bucket -> MetricBucket? in
                 guard let label = bucket.activityLevel,
                       let value = bucket.activeMinutesSum?.doubleValue else { return nil }
-                return MetricBucket(label: label.displayNameFromEnum, value: value, unit: "min")
+                return MetricBucket(label: activityLevelBucketLabel(label), value: value, unit: "min")
             }
         )
         if !activeBuckets.isEmpty {
             series.append(
                 BucketedMetricSeries(
                     type: .activeMinutes,
-                    title: "Activity Level",
-                    buckets: activeBuckets,
+                    title: "Activity Intensity",
+                    buckets: orderedBuckets(activeBuckets, labels: ["Light", "Moderate", "Vigorous"]),
                     rangeStart: range.start,
                     rangeEnd: range.end
                 )
@@ -471,16 +476,53 @@ enum GoogleHealthMapper {
         var bucketsByLabel: [String: MetricBucket] = [:]
 
         for bucket in buckets {
-            if var existing = bucketsByLabel[bucket.label] {
+            let label = bucket.label.trimmingCharacters(in: .whitespacesAndNewlines)
+            let key = normalizedBucketKey(label)
+            let bucket = MetricBucket(label: label, value: bucket.value, unit: bucket.unit)
+
+            if var existing = bucketsByLabel[key] {
                 existing.value += bucket.value
-                bucketsByLabel[bucket.label] = existing
+                bucketsByLabel[key] = existing
             } else {
-                orderedLabels.append(bucket.label)
-                bucketsByLabel[bucket.label] = bucket
+                orderedLabels.append(key)
+                bucketsByLabel[key] = bucket
             }
         }
 
         return orderedLabels.compactMap { bucketsByLabel[$0] }
+    }
+
+    private static func orderedBuckets(_ buckets: [MetricBucket], labels: [String]) -> [MetricBucket] {
+        let orderedKeys = labels.map(normalizedBucketKey)
+        return buckets.sorted { left, right in
+            let leftIndex = orderedKeys.firstIndex(of: normalizedBucketKey(left.label)) ?? orderedKeys.count
+            let rightIndex = orderedKeys.firstIndex(of: normalizedBucketKey(right.label)) ?? orderedKeys.count
+            guard leftIndex != rightIndex else {
+                return left.label < right.label
+            }
+            return leftIndex < rightIndex
+        }
+    }
+
+    private static func activityLevelBucketLabel(_ value: String) -> String {
+        switch normalizedBucketKey(value) {
+        case "LIGHT", "LIGHTLY_ACTIVE":
+            return "Light"
+        case "MODERATE", "MODERATELY_ACTIVE":
+            return "Moderate"
+        case "VIGOROUS", "VERY_ACTIVE":
+            return "Vigorous"
+        default:
+            return value.displayNameFromEnum
+        }
+    }
+
+    private static func normalizedBucketKey(_ value: String) -> String {
+        value
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .uppercased()
+            .replacingOccurrences(of: " ", with: "_")
+            .replacingOccurrences(of: "-", with: "_")
     }
 
     private static func heartRate(from record: GoogleHealthDataPoint?) -> Int? {
