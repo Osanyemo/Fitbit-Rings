@@ -4,12 +4,13 @@ struct SummaryView: View {
     @Bindable var viewModel: SummaryViewModel
     let accountEmail: String?
     let onSignOut: () -> Void
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var showingSettings = false
 
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: 0) {
+                LazyVStack(alignment: .leading, spacing: 0) {
                     ActivityTopBand(
                         snapshot: viewModel.snapshot,
                         onSettings: {
@@ -18,10 +19,9 @@ struct SummaryView: View {
                     )
 
                     VStack(alignment: .leading, spacing: 30) {
-                        SyncStatusBanner(
-                            syncState: viewModel.snapshot.syncState,
-                            errorMessage: viewModel.errorMessage
-                        )
+                        if let errorMessage = viewModel.errorMessage {
+                            SyncStatusBanner(errorMessage: errorMessage)
+                        }
 
                         TodayGoalsSection(
                             snapshot: viewModel.snapshot,
@@ -48,6 +48,7 @@ struct SummaryView: View {
             .refreshable {
                 await viewModel.refresh()
             }
+            .animation(statusAnimation, value: viewModel.errorMessage)
             .toolbar(.hidden, for: .navigationBar)
             .sheet(isPresented: $showingSettings) {
                 SettingsView(
@@ -58,6 +59,10 @@ struct SummaryView: View {
             }
         }
         .preferredColorScheme(viewModel.preferences.units.appearance.preferredColorScheme)
+    }
+
+    private var statusAnimation: Animation? {
+        reduceMotion ? nil : .smooth(duration: 0.22, extraBounce: 0)
     }
 }
 
@@ -217,10 +222,12 @@ private struct ActivityRingStats: View {
 private struct SyncPill: View {
     let syncState: SyncState
     let lastUpdated: Date
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         HStack(spacing: 6) {
             icon
+                .frame(width: 14, height: 14)
             Text(title)
                 .lineLimit(1)
                 .minimumScaleFactor(0.75)
@@ -234,6 +241,7 @@ private struct SyncPill: View {
             Capsule()
                 .stroke(borderStyle, lineWidth: 1)
         }
+        .animation(syncAnimation, value: syncState)
         .accessibilityLabel(accessibilityText)
     }
 
@@ -308,32 +316,24 @@ private struct SyncPill: View {
             return .dashboardStroke
         }
     }
+
+    private var syncAnimation: Animation? {
+        reduceMotion ? nil : .smooth(duration: 0.18, extraBounce: 0)
+    }
 }
 
 private struct SyncStatusBanner: View {
-    let syncState: SyncState
-    let errorMessage: String?
+    let errorMessage: String
 
     var body: some View {
-        if let errorMessage {
-            statusContent(
-                systemImage: "exclamationmark.triangle.fill",
-                title: "Could not refresh",
-                message: errorMessage,
-                foregroundColor: Color(uiColor: .systemRed),
-                background: .dashboardErrorSurface,
-                border: .dashboardErrorStroke
-            )
-        } else if syncState == .refreshing {
-            statusContent(
-                systemImage: "arrow.triangle.2.circlepath",
-                title: "Refreshing data",
-                message: "Showing the latest cached dashboard while Google Health updates.",
-                foregroundColor: Color(uiColor: .systemBlue),
-                background: .dashboardSyncSurface,
-                border: .dashboardSyncStroke
-            )
-        }
+        statusContent(
+            systemImage: "exclamationmark.triangle.fill",
+            title: "Could not refresh",
+            message: errorMessage,
+            foregroundColor: Color(uiColor: .systemRed),
+            background: .dashboardErrorSurface,
+            border: .dashboardErrorStroke
+        )
     }
 
     private func statusContent(
@@ -367,6 +367,7 @@ private struct SyncStatusBanner: View {
             RoundedRectangle(cornerRadius: 8, style: .continuous)
                 .stroke(border, lineWidth: 1)
         }
+        .transition(.opacity.combined(with: .move(edge: .top)))
     }
 }
 

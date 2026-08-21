@@ -4,6 +4,7 @@ struct ActivityRingsView: View {
     let rings: RingSet
     var showsCenterSummary = true
     var showsRingBadges = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     private let lineWidth: CGFloat = 22
 
     var body: some View {
@@ -42,6 +43,7 @@ struct ActivityRingsView: View {
                 .font(.system(.largeTitle, design: .rounded, weight: .bold))
                 .monospacedDigit()
                 .contentTransition(.numericText())
+                .animation(progressAnimation, value: rings.steps.value)
                 .lineLimit(1)
                 .minimumScaleFactor(0.72)
             Text("steps")
@@ -75,7 +77,8 @@ struct ActivityRingsView: View {
                 .shadow(color: color.opacity(0.20), radius: 7, x: 0, y: 3)
         }
         .padding(inset + lineWidth / 2)
-        .animation(.snappy(duration: 0.55), value: metric.cappedProgress)
+        .drawingGroup(opaque: false, colorMode: .linear)
+        .animation(progressAnimation, value: metric.cappedProgress)
     }
 
     private func ringBadges(size: CGFloat) -> some View {
@@ -100,6 +103,10 @@ struct ActivityRingsView: View {
 
     private var stroke: StrokeStyle {
         StrokeStyle(lineWidth: lineWidth, lineCap: .round, lineJoin: .round)
+    }
+
+    private var progressAnimation: Animation? {
+        reduceMotion ? nil : .smooth(duration: 0.52, extraBounce: 0)
     }
 }
 

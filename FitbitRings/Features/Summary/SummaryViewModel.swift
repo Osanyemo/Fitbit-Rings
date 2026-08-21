@@ -1,5 +1,5 @@
 import Foundation
-import SwiftUI
+import Observation
 
 @MainActor
 @Observable
@@ -52,19 +52,15 @@ final class SummaryViewModel {
         do {
             preferences = cache.loadPreferences()
 
-            withAnimation(.snappy(duration: 0.35)) {
-                if let cached = cache.loadDashboard() {
-                    snapshot = cached
-                } else if snapshot.lastUpdated == .distantPast {
-                    snapshot = .empty(goals: preferences.goals)
-                }
-                snapshot.syncState = .refreshing
+            if let cached = cache.loadDashboard() {
+                snapshot = cached
+            } else if snapshot.lastUpdated == .distantPast {
+                snapshot = .empty(goals: preferences.goals)
             }
+            snapshot.syncState = .refreshing
 
             let fresh = try await repository.refresh()
-            withAnimation(.snappy(duration: 0.45)) {
-                snapshot = fresh
-            }
+            snapshot = fresh
         } catch {
             guard !error.isCancellation else {
                 snapshot.syncState = .idle

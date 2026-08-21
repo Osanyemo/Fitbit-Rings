@@ -3,6 +3,7 @@ import SwiftUI
 struct TodayGoalsSection: View {
     let snapshot: DashboardSnapshot
     let units: UnitPreferences
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var isExpanded = true
 
     private let columns = [
@@ -14,7 +15,7 @@ struct TodayGoalsSection: View {
         VStack(alignment: .leading, spacing: 16) {
             DashboardSectionHeader(title: "Summary") {
                 Button {
-                    withAnimation(.snappy(duration: 0.28)) {
+                    withAnimation(sectionAnimation) {
                         isExpanded.toggle()
                     }
                 } label: {
@@ -130,6 +131,10 @@ struct TodayGoalsSection: View {
         }
 
         return "\(DashboardFormatting.time(sleep.startTime)) - \(DashboardFormatting.time(sleep.endTime))"
+    }
+
+    private var sectionAnimation: Animation? {
+        reduceMotion ? nil : .smooth(duration: 0.26, extraBounce: 0)
     }
 }
 
@@ -329,12 +334,15 @@ private struct MetricBadge: View {
 private struct MetricValueText: View {
     let value: String
     let unit: String
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         HStack(alignment: .lastTextBaseline, spacing: 3) {
             Text(value)
                 .font(.system(size: 31, weight: .bold, design: .rounded))
                 .monospacedDigit()
+                .contentTransition(.numericText())
+                .animation(valueAnimation, value: value)
                 .lineLimit(1)
                 .minimumScaleFactor(0.45)
                 .allowsTightening(true)
@@ -351,11 +359,16 @@ private struct MetricValueText: View {
         }
         .frame(maxWidth: .infinity, alignment: .trailing)
     }
+
+    private var valueAnimation: Animation? {
+        reduceMotion ? nil : .smooth(duration: 0.24, extraBounce: 0)
+    }
 }
 
 private struct FitnessProgressBar: View {
     let progress: Double
     let accentColor: Color
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         GeometryReader { geometry in
@@ -377,9 +390,14 @@ private struct FitnessProgressBar: View {
                         )
                     )
                     .frame(width: width)
+                    .animation(progressAnimation, value: normalizedProgress)
             }
         }
         .frame(height: 9)
+    }
+
+    private var progressAnimation: Animation? {
+        reduceMotion ? nil : .smooth(duration: 0.38, extraBounce: 0)
     }
 }
 

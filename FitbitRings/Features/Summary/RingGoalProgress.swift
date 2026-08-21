@@ -16,6 +16,7 @@ private struct ProgressRow: View {
     let metric: RingMetric
     let color: Color
     let systemImage: String
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -33,6 +34,8 @@ private struct ProgressRow: View {
                 Text(valueText)
                     .font(.subheadline.weight(.semibold).monospacedDigit())
                     .foregroundStyle(.secondary)
+                    .contentTransition(.numericText())
+                    .animation(progressAnimation, value: valueText)
                     .lineLimit(1)
                     .minimumScaleFactor(0.76)
 
@@ -47,6 +50,7 @@ private struct ProgressRow: View {
             ProgressView(value: metric.cappedProgress)
                 .tint(color)
                 .scaleEffect(x: 1, y: 1.25, anchor: .center)
+                .animation(progressAnimation, value: metric.cappedProgress)
         }
         .padding(12)
         .background(.dashboardMetricSurface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
@@ -64,5 +68,9 @@ private struct ProgressRow: View {
             return "\(value) / \(goal)"
         }
         return "\(value) / \(goal) \(metric.unit)"
+    }
+
+    private var progressAnimation: Animation? {
+        reduceMotion ? nil : .smooth(duration: 0.34, extraBounce: 0)
     }
 }
