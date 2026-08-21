@@ -35,7 +35,7 @@ struct TodayGoalsSection: View {
                         } label: {
                             FitnessGoalCard(card: card)
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(DashboardPressButtonStyle())
                     }
                 }
                 .transition(.opacity.combined(with: .move(edge: .top)))
@@ -226,10 +226,10 @@ struct RecentWorkoutSection: View {
                 }
                 .padding(16)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(.summarySurface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .dashboardSurface(level: .raised, accentColor: .activeRing)
                 .accessibilityElement(children: .combine)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(DashboardPressButtonStyle())
             .disabled(onSelect == nil)
         }
     }
@@ -361,20 +361,12 @@ private struct FitnessGoalCard: View {
         }
         .padding(16)
         .frame(maxWidth: .infinity, minHeight: 158, alignment: .topLeading)
-        .background(cardBackground, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .stroke(cardBorder, lineWidth: 1)
-        }
+        .dashboardSurface(
+            level: card.isHighlighted ? .prominent : .raised,
+            accentColor: card.accentColor,
+            isHighlighted: card.isHighlighted
+        )
         .accessibilityElement(children: .combine)
-    }
-
-    private var cardBackground: Color {
-        card.isHighlighted ? card.accentColor.opacity(0.16) : Color.summarySurface
-    }
-
-    private var cardBorder: Color {
-        card.isHighlighted ? card.accentColor.opacity(0.20) : Color.dashboardStroke
     }
 }
 
@@ -390,7 +382,21 @@ private struct GoalPercentBadge: View {
             .minimumScaleFactor(0.8)
             .padding(.horizontal, 8)
             .padding(.vertical, 4)
-            .background(color.opacity(0.12), in: Capsule())
+            .background(
+                LinearGradient(
+                    colors: [
+                        color.opacity(0.20),
+                        color.opacity(0.09)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                ),
+                in: Capsule()
+            )
+            .overlay {
+                Capsule()
+                    .stroke(color.opacity(0.20), lineWidth: 1)
+            }
     }
 }
 
@@ -405,7 +411,22 @@ private struct MetricBadge: View {
             .symbolRenderingMode(.hierarchical)
             .foregroundStyle(accentColor)
             .frame(width: size, height: size)
-            .background(accentColor.opacity(0.15), in: Circle())
+            .background(
+                LinearGradient(
+                    colors: [
+                        Color.dashboardInnerHighlight.opacity(0.82),
+                        accentColor.opacity(0.18)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                ),
+                in: Circle()
+            )
+            .overlay {
+                Circle()
+                    .stroke(accentColor.opacity(0.18), lineWidth: 1)
+            }
+            .shadow(color: accentColor.opacity(0.18), radius: 8, x: 0, y: 4)
     }
 }
 
@@ -457,21 +478,30 @@ private struct FitnessProgressBar: View {
 
             ZStack(alignment: .leading) {
                 Capsule()
-                    .fill(accentColor.opacity(0.24))
+                    .fill(Color.dashboardSurfaceInset)
+                    .overlay {
+                        Capsule()
+                            .stroke(Color.dashboardInnerHighlight.opacity(0.22), lineWidth: 1)
+                    }
 
                 Capsule()
                     .fill(
                         LinearGradient(
-                            colors: [accentColor.opacity(0.82), accentColor],
+                            colors: [
+                                accentColor.opacity(0.72),
+                                accentColor,
+                                Color.white.opacity(0.58)
+                            ],
                             startPoint: .leading,
                             endPoint: .trailing
                         )
                     )
                     .frame(width: width)
+                    .shadow(color: accentColor.opacity(0.26), radius: 7, x: 0, y: 2)
                     .animation(progressAnimation, value: normalizedProgress)
             }
         }
-        .frame(height: 9)
+        .frame(height: 10)
     }
 
     private var progressAnimation: Animation? {
@@ -541,11 +571,22 @@ private struct DashboardPillButtonStyle: ButtonStyle {
             .foregroundStyle(.primary)
             .padding(.horizontal, 14)
             .padding(.vertical, 8)
-            .background(.dashboardTintSurface, in: Capsule())
+            .background(
+                LinearGradient(
+                    colors: [
+                        Color.dashboardInnerHighlight.opacity(0.72),
+                        Color.dashboardTintSurface
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                ),
+                in: Capsule()
+            )
             .overlay {
                 Capsule()
-                    .stroke(.dashboardStroke, lineWidth: 1)
+                    .stroke(.dashboardElevatedStroke, lineWidth: 1)
             }
-            .opacity(configuration.isPressed ? 0.72 : 1)
+            .scaleEffect(configuration.isPressed ? 0.97 : 1)
+            .opacity(configuration.isPressed ? 0.78 : 1)
     }
 }

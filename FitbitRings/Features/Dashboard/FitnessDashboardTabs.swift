@@ -408,7 +408,7 @@ private struct SleepDetailView: View {
                                     .foregroundStyle(.secondary)
                             }
                             .padding(14)
-                            .background(.summarySurface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                            .dashboardSurface(level: .raised, accentColor: .sleepAccent)
                         }
                     }
                 }
@@ -453,7 +453,9 @@ private struct DashboardScrollView<Content: View>: View {
             .padding(.bottom, 34)
         }
         .scrollIndicators(.hidden)
-        .background(Color.fitbitBackground.ignoresSafeArea())
+        .background {
+            DashboardBackground()
+        }
         .overlay(alignment: .bottom) {
             DashboardBottomFade(color: .fitbitBackground)
         }
@@ -486,8 +488,20 @@ private struct DashboardLargeHeader: View {
                 Spacer(minLength: 10)
 
                 if state?.phase == .loading {
-                    ProgressView()
-                        .controlSize(.small)
+                    HStack(spacing: 6) {
+                        ProgressView()
+                            .controlSize(.mini)
+                        Text("Updating")
+                            .font(.caption.weight(.bold))
+                    }
+                    .foregroundStyle(Color(uiColor: .systemBlue))
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(.dashboardSyncSurface, in: Capsule())
+                    .overlay {
+                        Capsule()
+                            .stroke(.dashboardSyncStroke, lineWidth: 1)
+                    }
                 }
             }
 
@@ -500,11 +514,21 @@ private struct DashboardLargeHeader: View {
             }
 
             if let error = state?.errorMessage {
-                Text(error)
-                    .font(.footnote.weight(.semibold))
-                    .foregroundStyle(Color(uiColor: .systemRed))
-                    .fixedSize(horizontal: false, vertical: true)
-                    .padding(.top, 2)
+                HStack(alignment: .top, spacing: 10) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.subheadline.weight(.bold))
+                        .foregroundStyle(Color(uiColor: .systemRed))
+                        .frame(width: 18)
+
+                    Text(error)
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(12)
+                .dashboardSurface(level: .raised, accentColor: Color(uiColor: .systemRed), isHighlighted: true)
+                .padding(.top, 4)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -551,7 +575,7 @@ private struct ActivityTodayFocusSection: View {
                     } label: {
                         ActivityGoalTile(insight: insight)
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(DashboardPressButtonStyle())
                 }
             }
         }
@@ -703,10 +727,20 @@ private struct ActivityStatusPill: View {
             .minimumScaleFactor(0.76)
             .padding(.horizontal, 10)
             .padding(.vertical, 6)
-            .background(.dashboardTintSurface, in: Capsule())
+            .background(
+                LinearGradient(
+                    colors: [
+                        Color.dashboardInnerHighlight.opacity(0.72),
+                        Color.dashboardTintSurface
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                ),
+                in: Capsule()
+            )
             .overlay {
                 Capsule()
-                    .stroke(.dashboardStroke, lineWidth: 1)
+                    .stroke(.dashboardElevatedStroke, lineWidth: 1)
             }
     }
 }
@@ -722,7 +756,21 @@ private struct ActivityGoalTile: View {
                     .symbolRenderingMode(.hierarchical)
                     .foregroundStyle(insight.accentColor)
                     .frame(width: 26, height: 26)
-                    .background(insight.accentColor.opacity(0.15), in: Circle())
+                    .background(
+                        LinearGradient(
+                            colors: [
+                                Color.dashboardInnerHighlight.opacity(0.78),
+                                insight.accentColor.opacity(0.18)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        in: Circle()
+                    )
+                    .overlay {
+                        Circle()
+                            .stroke(insight.accentColor.opacity(0.18), lineWidth: 1)
+                    }
 
                 Text(insight.title)
                     .font(.caption.weight(.bold))
@@ -760,27 +808,22 @@ private struct ActivityGoalTile: View {
             Spacer(minLength: 0)
 
             if insight.isAvailable {
-                ProgressView(value: min(max(insight.progress, 0), 1))
-                    .tint(insight.accentColor)
+                DashboardProgressTrack(
+                    progress: insight.progress,
+                    accentColor: insight.accentColor,
+                    height: 8
+                )
                     .accessibilityLabel("\(insight.title) \(insight.progressText)")
             }
         }
         .padding(14)
         .frame(maxWidth: .infinity, minHeight: 142, alignment: .topLeading)
-        .background(tileBackground, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .stroke(tileBorder, lineWidth: 1)
-        }
+        .dashboardSurface(
+            level: insight.isComplete ? .prominent : .raised,
+            accentColor: insight.accentColor,
+            isHighlighted: insight.isComplete
+        )
         .accessibilityElement(children: .combine)
-    }
-
-    private var tileBackground: Color {
-        insight.isComplete ? insight.accentColor.opacity(0.16) : Color.summarySurface
-    }
-
-    private var tileBorder: Color {
-        insight.isComplete ? insight.accentColor.opacity(0.20) : Color.dashboardStroke
     }
 }
 
@@ -800,7 +843,7 @@ struct DashboardMetricCard: View {
             Button(action: onSelect) {
                 cardContent
             }
-            .buttonStyle(.plain)
+            .buttonStyle(DashboardPressButtonStyle())
             .accessibilityElement(children: .combine)
         } else {
             cardContent
@@ -816,7 +859,22 @@ struct DashboardMetricCard: View {
                     .symbolRenderingMode(.hierarchical)
                     .foregroundStyle(accentColor)
                     .frame(width: 36, height: 36)
-                    .background(accentColor.opacity(0.15), in: Circle())
+                    .background(
+                        LinearGradient(
+                            colors: [
+                                Color.dashboardInnerHighlight.opacity(0.80),
+                                accentColor.opacity(0.18)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        in: Circle()
+                    )
+                    .overlay {
+                        Circle()
+                            .stroke(accentColor.opacity(0.18), lineWidth: 1)
+                    }
+                    .shadow(color: accentColor.opacity(0.16), radius: 7, x: 0, y: 4)
 
                 VStack(alignment: .leading, spacing: 3) {
                     Text(title)
@@ -868,11 +926,7 @@ struct DashboardMetricCard: View {
         }
         .padding(16)
         .frame(maxWidth: .infinity, minHeight: points.isEmpty ? 134 : 184, alignment: .topLeading)
-        .background(.summarySurface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .stroke(.dashboardStroke, lineWidth: 1)
-        }
+        .dashboardSurface(level: .raised, accentColor: accentColor, isHighlighted: isAvailable && !points.isEmpty)
     }
 }
 
@@ -973,11 +1027,7 @@ private struct BucketList: View {
             }
         }
         .padding(16)
-        .background(.summarySurface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .stroke(.dashboardStroke, lineWidth: 1)
-        }
+        .dashboardSurface(level: .raised)
     }
 }
 
@@ -1113,7 +1163,7 @@ private struct WorkoutSplitsSection: View {
                 }
                 .padding(14)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(.summarySurface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .dashboardSurface(level: .raised, accentColor: .activeRing)
             }
         }
     }
@@ -1139,7 +1189,7 @@ private struct MetricPointList: View {
                         .foregroundStyle(.secondary)
                 }
                 .padding(14)
-                .background(.summarySurface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .dashboardSurface(level: .raised, accentColor: series.type.accentColor)
             }
         }
     }
@@ -1152,15 +1202,38 @@ private struct MetricBarChart: View {
     var body: some View {
         GeometryReader { geometry in
             let maxValue = max(points.map(\.value).max() ?? 0, 1)
-            HStack(alignment: .bottom, spacing: 3) {
-                ForEach(points.suffix(24)) { point in
-                    Capsule()
-                        .fill(color.opacity(0.82))
-                        .frame(
-                            width: barWidth(in: geometry.size.width),
-                            height: max(3, geometry.size.height * CGFloat(max(0, point.value) / maxValue))
-                        )
+            let chartHeight = max(0, geometry.size.height - 10)
+            ZStack(alignment: .bottomLeading) {
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .fill(Color.dashboardSurfaceInset)
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 6, style: .continuous)
+                            .stroke(Color.dashboardInnerHighlight.opacity(0.18), lineWidth: 1)
+                    }
+
+                HStack(alignment: .bottom, spacing: 3) {
+                    ForEach(points.suffix(24)) { point in
+                        Capsule()
+                            .fill(
+                                LinearGradient(
+                                    colors: [
+                                        color.opacity(0.58),
+                                        color,
+                                        Color.white.opacity(0.50)
+                                    ],
+                                    startPoint: .bottom,
+                                    endPoint: .top
+                                )
+                            )
+                            .frame(
+                                width: barWidth(in: max(0, geometry.size.width - 12)),
+                                height: max(4, chartHeight * CGFloat(max(0, point.value) / maxValue))
+                            )
+                            .shadow(color: color.opacity(0.18), radius: 5, x: 0, y: 2)
+                    }
                 }
+                .padding(.horizontal, 6)
+                .padding(.vertical, 5)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
         }
@@ -1190,11 +1263,7 @@ private struct DashboardEmptyState: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(16)
-        .background(.summarySurface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .stroke(.dashboardStroke, lineWidth: 1)
-        }
+        .dashboardSurface(level: .raised)
     }
 }
 

@@ -12,6 +12,8 @@ struct ActivityRingsView: View {
             let size = min(geometry.size.width, geometry.size.height)
 
             ZStack {
+                ringBase
+
                 ring(metric: rings.move, color: .moveRing, inset: 0)
                 ring(metric: rings.active, color: .activeRing, inset: 34)
                 ring(metric: rings.steps, color: .stepsRing, inset: 68)
@@ -37,6 +39,27 @@ struct ActivityRingsView: View {
         )
     }
 
+    private var ringBase: some View {
+        Circle()
+            .fill(
+                LinearGradient(
+                    colors: [
+                        Color.dashboardSurfaceProminent.opacity(0.92),
+                        Color.dashboardSurfaceInset.opacity(0.72)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            )
+            .overlay {
+                Circle()
+                    .stroke(Color.dashboardInnerHighlight.opacity(0.38), lineWidth: 1)
+            }
+            .padding(47)
+            .shadow(color: Color.black.opacity(0.18), radius: 18, x: 0, y: 10)
+            .accessibilityHidden(true)
+    }
+
     private var centerSummary: some View {
         VStack(spacing: 4) {
             Text(DashboardFormatting.integer(rings.steps.value))
@@ -58,23 +81,38 @@ struct ActivityRingsView: View {
                 .accessibilityHidden(true)
         }
         .padding(.horizontal, 28)
+        .padding(.vertical, 15)
+        .dashboardSurface(level: .inset, accentColor: .stepsRing, cornerRadius: 8)
     }
 
     private func ring(metric: RingMetric, color: Color, inset: CGFloat) -> some View {
         ZStack {
             RingShape(progress: 1)
-                .stroke(color.opacity(0.14), style: stroke)
+                .stroke(Color.dashboardSurfaceInset, style: stroke)
+                .shadow(color: Color.black.opacity(0.20), radius: 4, x: 0, y: 2)
+            RingShape(progress: 1)
+                .stroke(color.opacity(0.18), style: stroke)
             RingShape(progress: metric.cappedProgress)
                 .stroke(
                     AngularGradient(
-                        colors: [color.opacity(0.68), color],
+                        colors: [
+                            color.opacity(0.58),
+                            color,
+                            Color.white.opacity(0.72),
+                            color.opacity(0.88)
+                        ],
                         center: .center,
                         startAngle: .degrees(-90),
                         endAngle: .degrees(270)
                     ),
                     style: stroke
                 )
-                .shadow(color: color.opacity(0.20), radius: 7, x: 0, y: 3)
+                .shadow(color: color.opacity(0.34), radius: 11, x: 0, y: 5)
+                .overlay {
+                    RingShape(progress: metric.cappedProgress)
+                        .stroke(color.opacity(0.42), style: hairlineStroke)
+                        .padding(lineWidth * 0.38)
+                }
         }
         .padding(inset + lineWidth / 2)
         .drawingGroup(opaque: false, colorMode: .linear)
@@ -98,11 +136,27 @@ struct ActivityRingsView: View {
             .font(.system(size: 15, weight: .heavy, design: .rounded))
             .foregroundStyle(Color.black.opacity(0.82))
             .frame(width: lineWidth * 1.35, height: lineWidth * 1.35)
-            .background(color, in: Circle())
+            .background(
+                LinearGradient(
+                    colors: [Color.white.opacity(0.72), color],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                ),
+                in: Circle()
+            )
+            .overlay {
+                Circle()
+                    .stroke(Color.black.opacity(0.12), lineWidth: 1)
+            }
+            .shadow(color: color.opacity(0.34), radius: 8, x: 0, y: 4)
     }
 
     private var stroke: StrokeStyle {
         StrokeStyle(lineWidth: lineWidth, lineCap: .round, lineJoin: .round)
+    }
+
+    private var hairlineStroke: StrokeStyle {
+        StrokeStyle(lineWidth: 1.2, lineCap: .round, lineJoin: .round)
     }
 
     private var progressAnimation: Animation? {

@@ -35,7 +35,7 @@ private struct ProgressRow: View {
                     .font(.subheadline.weight(.semibold).monospacedDigit())
                     .foregroundStyle(.secondary)
                     .contentTransition(.numericText())
-                    .animation(progressAnimation, value: valueText)
+                    .animation(valueAnimation, value: valueText)
                     .lineLimit(1)
                     .minimumScaleFactor(0.76)
 
@@ -47,17 +47,10 @@ private struct ProgressRow: View {
                     .background(color.opacity(0.12), in: Capsule())
             }
 
-            ProgressView(value: metric.cappedProgress)
-                .tint(color)
-                .scaleEffect(x: 1, y: 1.25, anchor: .center)
-                .animation(progressAnimation, value: metric.cappedProgress)
+            DashboardProgressTrack(progress: metric.cappedProgress, accentColor: color, height: 10)
         }
         .padding(12)
-        .background(.dashboardMetricSurface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .stroke(color.opacity(0.10), lineWidth: 1)
-        }
+        .dashboardSurface(level: .raised, accentColor: color, isHighlighted: metric.progress >= 1)
         .accessibilityElement(children: .combine)
     }
 
@@ -70,7 +63,7 @@ private struct ProgressRow: View {
         return "\(value) / \(goal) \(metric.unit)"
     }
 
-    private var progressAnimation: Animation? {
-        reduceMotion ? nil : .smooth(duration: 0.34, extraBounce: 0)
+    private var valueAnimation: Animation? {
+        reduceMotion ? nil : .smooth(duration: 0.28, extraBounce: 0)
     }
 }

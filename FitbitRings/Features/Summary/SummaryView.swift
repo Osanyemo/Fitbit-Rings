@@ -65,8 +65,7 @@ struct SummaryView: View {
         }
         .scrollIndicators(.hidden)
         .background {
-            Color.fitbitBackground
-                .ignoresSafeArea()
+            DashboardBackground()
         }
         .overlay(alignment: .bottom) {
             ScrollBottomFade(color: .fitbitBackground)
@@ -132,7 +131,28 @@ private struct ActivityTopBand: View {
         .padding(.horizontal, 20)
         .padding(.top, 54)
         .padding(.bottom, 30)
-        .background(Color.activityHeaderSurface)
+        .background {
+            ZStack {
+                Color.activityHeaderSurface
+                LinearGradient(
+                    colors: [
+                        Color.stepsRing.opacity(0.15),
+                        Color.activeRing.opacity(0.08),
+                        .clear
+                    ],
+                    startPoint: .topTrailing,
+                    endPoint: .bottomLeading
+                )
+                LinearGradient(
+                    colors: [
+                        Color.dashboardInnerHighlight.opacity(0.60),
+                        .clear
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+            }
+        }
         .overlay(alignment: .bottom) {
             Rectangle()
                 .fill(.dashboardStroke)
@@ -169,13 +189,24 @@ private struct ActivityHeader: View {
                     Image(systemName: "gearshape.fill")
                         .font(.system(size: 16, weight: .bold))
                         .frame(width: 36, height: 36)
-                        .background(.dashboardTintSurface, in: Circle())
+                        .background(
+                            LinearGradient(
+                                colors: [
+                                    Color.dashboardInnerHighlight.opacity(0.86),
+                                    Color.dashboardTintSurface
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                            in: Circle()
+                        )
                         .overlay {
                             Circle()
-                                .stroke(.dashboardStroke, lineWidth: 1)
+                                .stroke(.dashboardElevatedStroke, lineWidth: 1)
                         }
+                        .shadow(color: Color.black.opacity(0.10), radius: 7, x: 0, y: 4)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(DashboardPressButtonStyle())
                 .foregroundStyle(.primary)
                 .accessibilityLabel("Settings")
 
@@ -198,35 +229,115 @@ private struct ActivityHeroPanel: View {
     let rings: RingSet
 
     var body: some View {
-        ViewThatFits(in: .horizontal) {
-            HStack(alignment: .center, spacing: 14) {
-                ActivityRingStats(rings: rings)
-                    .frame(width: 116, alignment: .leading)
+        VStack(alignment: .leading, spacing: 18) {
+            HStack(alignment: .firstTextBaseline, spacing: 12) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(statusTitle)
+                        .font(.title2.weight(.bold))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.76)
 
-                Spacer(minLength: 0)
+                    Text(statusSubtitle)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.76)
+                }
 
-                ActivityRingsView(
-                    rings: rings,
-                    showsCenterSummary: false,
-                    showsRingBadges: true
-                )
-                .frame(width: 208)
+                Spacer(minLength: 8)
+
+                Text(DashboardFormatting.percent(averageProgress))
+                    .font(.headline.weight(.heavy).monospacedDigit())
+                    .foregroundStyle(.activeRing)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(.activeRing.opacity(0.15), in: Capsule())
+                    .accessibilityLabel("Average ring progress \(DashboardFormatting.percent(averageProgress))")
             }
 
-            VStack(alignment: .leading, spacing: 20) {
-                ActivityRingsView(
-                    rings: rings,
-                    showsCenterSummary: false,
-                    showsRingBadges: true
-                )
-                .frame(maxWidth: 250)
-                .frame(maxWidth: .infinity)
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .center, spacing: 18) {
+                    ActivityRingStats(rings: rings)
+                        .frame(width: 142, alignment: .leading)
 
-                ActivityRingStats(rings: rings)
+                    Spacer(minLength: 0)
+
+                    ActivityRingsView(
+                        rings: rings,
+                        showsCenterSummary: true,
+                        showsRingBadges: true
+                    )
+                    .frame(width: 220)
+                }
+
+                VStack(alignment: .leading, spacing: 18) {
+                    ActivityRingsView(
+                        rings: rings,
+                        showsCenterSummary: true,
+                        showsRingBadges: true
+                    )
+                    .frame(maxWidth: 264)
+                    .frame(maxWidth: .infinity)
+
+                    ActivityRingStats(rings: rings)
+                }
             }
         }
+        .padding(18)
         .frame(maxWidth: .infinity, alignment: .leading)
+        .dashboardSurface(
+            level: .prominent,
+            accentColor: statusAccent,
+            isHighlighted: closedCount == heroGoals.count
+        )
     }
+
+    private var heroGoals: [ActivityHeroGoal] {
+        [
+            ActivityHeroGoal(title: "Move", metric: rings.move, unit: "kcal", color: .moveRing),
+            ActivityHeroGoal(title: "Exercise", metric: rings.active, unit: "min", color: .activeRing),
+            ActivityHeroGoal(title: "Steps", metric: rings.steps, unit: "steps", color: .stepsRing)
+        ]
+    }
+
+    private var closedCount: Int {
+        heroGoals.filter { $0.metric.progress >= 1 }.count
+    }
+
+    private var averageProgress: Double {
+        let progress = heroGoals.map { min(max($0.metric.progress, 0), 1) }
+        return progress.reduce(0, +) / Double(max(progress.count, 1))
+    }
+
+    private var nextGoal: ActivityHeroGoal? {
+        heroGoals
+            .filter { $0.metric.progress < 1 }
+            .max { $0.metric.progress < $1.metric.progress }
+    }
+
+    private var statusTitle: String {
+        closedCount == heroGoals.count ? "Rings closed" : "\(closedCount)/\(heroGoals.count) rings closed"
+    }
+
+    private var statusSubtitle: String {
+        guard let nextGoal else {
+            return "Move, exercise, and steps are complete today."
+        }
+
+        let remaining = DashboardFormatting.integer(max(0, nextGoal.metric.goal - nextGoal.metric.value))
+        return "\(remaining) \(nextGoal.unit) to close \(nextGoal.title.lowercased())."
+    }
+
+    private var statusAccent: Color {
+        nextGoal?.color ?? .activeRing
+    }
+}
+
+private struct ActivityHeroGoal {
+    let title: String
+    let metric: RingMetric
+    let unit: String
+    let color: Color
 }
 
 private struct ActivityRingStats: View {
@@ -234,13 +345,13 @@ private struct ActivityRingStats: View {
 
     var body: some View {
         ViewThatFits(in: .horizontal) {
-            VStack(alignment: .leading, spacing: 22) {
+            VStack(alignment: .leading, spacing: 10) {
                 heroMetric(title: "Move", metric: rings.move, unit: "kcal", color: .moveRing)
                 heroMetric(title: "Exercise", metric: rings.active, unit: "min", color: .activeRing)
                 heroMetric(title: "Steps", metric: rings.steps, unit: "steps", color: .stepsRing)
             }
 
-            HStack(alignment: .top, spacing: 22) {
+            HStack(alignment: .top, spacing: 10) {
                 heroMetric(title: "Move", metric: rings.move, unit: "kcal", color: .moveRing)
                 heroMetric(title: "Exercise", metric: rings.active, unit: "min", color: .activeRing)
                 heroMetric(title: "Steps", metric: rings.steps, unit: "steps", color: .stepsRing)
@@ -254,27 +365,54 @@ private struct ActivityRingStats: View {
         unit: String,
         color: Color
     ) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(title)
-                .font(.title3.weight(.bold))
-                .foregroundStyle(color)
-                .lineLimit(1)
-                .minimumScaleFactor(0.72)
+        HStack(alignment: .center, spacing: 9) {
+            Capsule()
+                .fill(
+                    LinearGradient(
+                        colors: [color, color.opacity(0.55)],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
+                .frame(width: 5)
 
-            Text(DashboardFormatting.integer(metric.value))
-                .font(.system(size: 30, weight: .bold, design: .rounded))
-                .monospacedDigit()
-                .foregroundStyle(.primary)
-                .lineLimit(1)
-                .minimumScaleFactor(0.45)
-                .allowsTightening(true)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.caption.weight(.heavy))
+                    .foregroundStyle(color)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.72)
 
-            Text(unit)
-                .font(.headline.weight(.semibold))
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-                .minimumScaleFactor(0.7)
+                HStack(alignment: .lastTextBaseline, spacing: 3) {
+                    Text(DashboardFormatting.integer(metric.value))
+                        .font(.system(size: 24, weight: .bold, design: .rounded))
+                        .monospacedDigit()
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.45)
+                        .allowsTightening(true)
+
+                    Text(unit)
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.62)
+                }
+
+                Text(DashboardFormatting.percent(metric.progress))
+                    .font(.caption2.weight(.heavy).monospacedDigit())
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .padding(10)
+        .frame(maxWidth: .infinity, minHeight: 70, alignment: .leading)
+        .dashboardSurface(
+            level: .inset,
+            accentColor: color,
+            isHighlighted: metric.progress >= 1
+        )
         .accessibilityElement(children: .combine)
     }
 }
@@ -296,11 +434,22 @@ private struct SyncPill: View {
         .foregroundStyle(foregroundStyle)
         .padding(.horizontal, 10)
         .padding(.vertical, 7)
-        .background(backgroundStyle, in: Capsule())
+        .background(
+            LinearGradient(
+                colors: [
+                    Color.dashboardInnerHighlight.opacity(0.56),
+                    backgroundStyle
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            ),
+            in: Capsule()
+        )
         .overlay {
             Capsule()
                 .stroke(borderStyle, lineWidth: 1)
         }
+        .shadow(color: foregroundStyle.opacity(0.12), radius: 8, x: 0, y: 4)
         .animation(syncAnimation, value: syncState)
         .accessibilityLabel(accessibilityText)
     }
@@ -422,7 +571,7 @@ private struct SyncStatusBanner: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(14)
-        .background(background, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .dashboardSurface(level: .raised, accentColor: foregroundColor, isHighlighted: true)
         .overlay {
             RoundedRectangle(cornerRadius: 8, style: .continuous)
                 .stroke(border, lineWidth: 1)
