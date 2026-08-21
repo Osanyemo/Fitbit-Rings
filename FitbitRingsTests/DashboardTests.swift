@@ -16,19 +16,13 @@ final class DashboardTests: XCTestCase {
 
     func testGoogleHealthMapperBuildsDashboardSnapshot() throws {
         let response = GoogleHealthRollUpResponse(
-            bucket: [
-                GoogleHealthBucket(
-                    dataset: [
-                        GoogleHealthDataset(
-                            point: [
-                                GoogleHealthPoint(
-                                    startTime: nil,
-                                    endTime: nil,
-                                    value: [GoogleHealthValue(intVal: 7_842, fpVal: nil, stringVal: nil, mapVal: nil)]
-                                )
-                            ]
-                        )
-                    ]
+            rollupDataPoints: [
+                GoogleHealthRollupDataPoint(
+                    steps: GoogleHealthStepsRollup(countSum: GoogleHealthNumericValue(7_842)),
+                    activeMinutes: nil,
+                    activeEnergyBurned: nil,
+                    distance: nil,
+                    totalCalories: nil
                 )
             ]
         )
@@ -46,6 +40,21 @@ final class DashboardTests: XCTestCase {
         XCTAssertEqual(snapshot.activity.steps, 7_842)
         XCTAssertEqual(snapshot.rings.steps.value, 7_842)
         XCTAssertEqual(snapshot.rings.steps.goal, 10_000)
+    }
+
+    @MainActor
+    func testSummaryRefreshIgnoresCancelledRequests() async {
+        let cache = InMemoryDashboardCache()
+        let repository = DashboardRepository(
+            googleHealthClient: ThrowingGoogleHealthClient(error: URLError(.cancelled)),
+            cache: cache
+        )
+        let viewModel = SummaryViewModel(repository: repository, cache: cache)
+
+        await viewModel.refresh()
+
+        XCTAssertNil(viewModel.errorMessage)
+        XCTAssertEqual(viewModel.snapshot.syncState, .idle)
     }
 
     func testMissingScopesErrorNamesScopes() {
@@ -102,5 +111,35 @@ final class DashboardTests: XCTestCase {
         XCTAssertTrue(
             error?.localizedDescription.contains("com.googleusercontent.apps.1234567890-abcdef") == true
         )
+    }
+}
+
+private struct ThrowingGoogleHealthClient: GoogleHealthServing {
+    var error: Error
+
+    func fetchDashboard(goals: ActivityGoals, date: Date) async throws -> DashboardSnapshot {
+        throw error
+    }
+}
+
+@MainActor
+private final class InMemoryDashboardCache: DashboardCaching {
+    var snapshot: DashboardSnapshot?
+    var preferences: DashboardPreferences = .defaults
+
+    func loadDashboard() -> DashboardSnapshot? {
+        snapshot
+    }
+
+    func saveDashboard(_ snapshot: DashboardSnapshot) {
+        self.snapshot = snapshot
+    }
+
+    func loadPreferences() -> DashboardPreferences {
+        preferences
+    }
+
+    func savePreferences(_ preferences: DashboardPreferences) {
+        self.preferences = preferences
     }
 }

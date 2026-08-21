@@ -56,6 +56,11 @@ final class SummaryViewModel {
                 snapshot = fresh
             }
         } catch {
+            guard !error.isCancellation else {
+                snapshot.syncState = .idle
+                errorMessage = nil
+                return
+            }
             snapshot.syncState = .failed
             errorMessage = error.localizedDescription
         }
@@ -81,5 +86,20 @@ final class SummaryViewModel {
     func saveAppearance(_ appearance: AppearancePreference) {
         preferences.units.appearance = appearance
         cache.savePreferences(preferences)
+    }
+}
+
+private extension Error {
+    var isCancellation: Bool {
+        if self is CancellationError {
+            return true
+        }
+
+        if let urlError = self as? URLError, urlError.code == .cancelled {
+            return true
+        }
+
+        let nsError = self as NSError
+        return nsError.domain == NSURLErrorDomain && nsError.code == NSURLErrorCancelled
     }
 }
