@@ -33,6 +33,13 @@ enum DashboardFormatting {
         return "\(minutes)m"
     }
 
+    static func percent(_ progress: Double) -> String {
+        guard progress.isFinite else { return "0%" }
+
+        let roundedPercent = Int((max(0, progress) * 100).rounded())
+        return "\(roundedPercent)%"
+    }
+
     static func time(_ date: Date?) -> String {
         guard let date else { return "--" }
         return date.formatted(date: .omitted, time: .shortened)

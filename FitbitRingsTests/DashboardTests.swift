@@ -1,3 +1,4 @@
+import SwiftUI
 import XCTest
 @testable import FitbitRings
 
@@ -12,6 +13,20 @@ final class DashboardTests: XCTestCase {
     func testDistanceFormattingUsesSelectedUnit() {
         XCTAssertEqual(DashboardFormatting.distance(1_000, unit: .kilometers), "1.00 km")
         XCTAssertEqual(DashboardFormatting.distance(1_609.344, unit: .miles), "1.00 mi")
+    }
+
+    func testPercentFormattingRoundsProgress() {
+        XCTAssertEqual(DashboardFormatting.percent(0), "0%")
+        XCTAssertEqual(DashboardFormatting.percent(0.865), "87%")
+        XCTAssertEqual(DashboardFormatting.percent(1.25), "125%")
+        XCTAssertEqual(DashboardFormatting.percent(-0.2), "0%")
+        XCTAssertEqual(DashboardFormatting.percent(.infinity), "0%")
+    }
+
+    func testAppearancePreferenceMapsToPreferredColorScheme() {
+        XCTAssertNil(AppearancePreference.system.preferredColorScheme)
+        XCTAssertEqual(AppearancePreference.light.preferredColorScheme, ColorScheme.light)
+        XCTAssertEqual(AppearancePreference.dark.preferredColorScheme, ColorScheme.dark)
     }
 
     func testGoogleHealthMapperBuildsDashboardSnapshot() throws {

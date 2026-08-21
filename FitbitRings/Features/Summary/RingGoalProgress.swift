@@ -4,10 +4,10 @@ struct RingGoalProgress: View {
     let rings: RingSet
 
     var body: some View {
-        VStack(spacing: 12) {
-            ProgressRow(metric: rings.move, color: .moveRing)
-            ProgressRow(metric: rings.active, color: .activeRing)
-            ProgressRow(metric: rings.steps, color: .stepsRing)
+        VStack(spacing: 10) {
+            ProgressRow(metric: rings.move, color: .moveRing, systemImage: "flame.fill")
+            ProgressRow(metric: rings.active, color: .activeRing, systemImage: "bolt.heart.fill")
+            ProgressRow(metric: rings.steps, color: .stepsRing, systemImage: "figure.walk")
         }
     }
 }
@@ -15,20 +15,46 @@ struct RingGoalProgress: View {
 private struct ProgressRow: View {
     let metric: RingMetric
     let color: Color
+    let systemImage: String
 
     var body: some View {
-        HStack {
-            Circle()
-                .fill(color)
-                .frame(width: 10, height: 10)
-            Text(metric.title)
-                .font(.headline)
-            Spacer()
-            Text(valueText)
-                .font(.headline.monospacedDigit())
-                .foregroundStyle(.secondary)
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 10) {
+                Image(systemName: systemImage)
+                    .font(.subheadline.weight(.bold))
+                    .foregroundStyle(color)
+                    .frame(width: 20)
+
+                Text(metric.title)
+                    .font(.subheadline.weight(.bold))
+
+                Spacer(minLength: 8)
+
+                Text(valueText)
+                    .font(.subheadline.weight(.semibold).monospacedDigit())
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.76)
+
+                Text(DashboardFormatting.percent(metric.progress))
+                    .font(.caption.weight(.bold).monospacedDigit())
+                    .foregroundStyle(color)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(color.opacity(0.12), in: Capsule())
+            }
+
+            ProgressView(value: metric.cappedProgress)
+                .tint(color)
+                .scaleEffect(x: 1, y: 1.25, anchor: .center)
         }
-        .padding(.vertical, 2)
+        .padding(12)
+        .background(.dashboardMetricSurface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .stroke(color.opacity(0.10), lineWidth: 1)
+        }
+        .accessibilityElement(children: .combine)
     }
 
     private var valueText: String {
