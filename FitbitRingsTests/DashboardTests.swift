@@ -220,7 +220,11 @@ final class DashboardTests: XCTestCase {
         cache.fitnessSnapshot = FitnessDataSnapshot.fromLegacyDashboard(summary)
         let client = SectionedGoogleHealthClient(summary: summary)
         let repository = DashboardRepository(googleHealthClient: client, cache: cache)
-        let store = FitnessDashboardStore(repository: repository, cache: cache)
+        let store = FitnessDashboardStore(
+            repository: repository,
+            cache: cache,
+            staleAfter: .greatestFiniteMagnitude
+        )
 
         await store.loadIfNeeded(.activity)
         await store.loadIfNeeded(.activity)
@@ -229,6 +233,38 @@ final class DashboardTests: XCTestCase {
         XCTAssertEqual(count, 1)
         XCTAssertEqual(store.sectionState(.activity).phase, .loaded)
         XCTAssertEqual(store.snapshot.activity.dailySeries.first?.type, .steps)
+    }
+
+    @MainActor
+    func testFitnessDashboardStoreRefreshesStaleCachedActivity() async {
+        let oldDate = Date(timeIntervalSince1970: 1_000)
+        let summary = dashboardSnapshot(steps: 1_234, lastUpdated: oldDate)
+        let cachedPoint = NumericMetricPoint(
+            id: "cached-steps",
+            startDate: oldDate,
+            value: 42,
+            unit: "steps"
+        )
+        let cache = InMemoryDashboardCache()
+        cache.fitnessSnapshot = FitnessDataSnapshot(
+            summary: summary,
+            activity: ActivityDashboardData(
+                dailySeries: [NumericMetricSeries(type: .steps, points: [cachedPoint])],
+                hourlySeries: [],
+                bucketedSeries: [],
+                loadedAt: oldDate
+            ),
+            lastUpdated: oldDate
+        )
+        let client = SectionedGoogleHealthClient(summary: summary)
+        let repository = DashboardRepository(googleHealthClient: client, cache: cache)
+        let store = FitnessDashboardStore(repository: repository, cache: cache, staleAfter: 60)
+
+        await store.loadIfNeeded(.activity)
+
+        let count = await client.activityFetchCount
+        XCTAssertEqual(count, 1)
+        XCTAssertEqual(store.snapshot.activity.dailySeries.first?.points.first?.value, 1_234)
     }
 
     @MainActor

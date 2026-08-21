@@ -75,11 +75,13 @@ final class GoogleHealthClient: GoogleHealthServing {
     }
 
     func fetchActivityData(date: Date) async throws -> ActivityDashboardData {
-        let range = recentInterval(days: 14, endingAt: date)
+        let range = dailyRollupInterval(days: 14, endingAt: date)
+        let displayRange = DateInterval(start: range.start, end: date)
         let todaySoFar = intradayInterval(endingAt: date)
 
         var dailyRollups: [GoogleHealthDataType: GoogleHealthRollUpResponse] = [:]
         var hourlyRollups: [GoogleHealthDataType: GoogleHealthRollUpResponse] = [:]
+        var currentDayRollups: [GoogleHealthDataType: GoogleHealthRollUpResponse] = [:]
         var records: [GoogleHealthDataType: [GoogleHealthDataPoint]] = [:]
 
         for type in Self.activityRollupTypes {
@@ -91,11 +93,18 @@ final class GoogleHealthClient: GoogleHealthServing {
         for type in [GoogleHealthDataType.steps, .distance] {
             if let response = try await optionalData({ try await rollUpAll(type, interval: todaySoFar, windowSize: "3600s") }) {
                 hourlyRollups[type] = response
+                currentDayRollups[type] = response
+            }
+        }
+
+        for type in Self.activityRollupTypes where type != .steps && type != .distance {
+            if let response = try await optionalData({ try await rollUpAll(type, interval: todaySoFar, windowSize: "86400s") }) {
+                currentDayRollups[type] = response
             }
         }
 
         for type in Self.activityReconcileTypes {
-            if let response = try await optionalData({ try await reconcileAll(type, interval: range) }) {
+            if let response = try await optionalData({ try await reconcileAll(type, interval: displayRange) }) {
                 records[type] = response.dataPoints
             }
         }
@@ -103,8 +112,9 @@ final class GoogleHealthClient: GoogleHealthServing {
         return GoogleHealthMapper.mapActivityData(
             dailyRollups: dailyRollups,
             hourlyRollups: hourlyRollups,
+            currentDayRollups: currentDayRollups,
             records: records,
-            range: range,
+            range: displayRange,
             calendar: calendar,
             currentDate: date
         )
@@ -146,7 +156,7 @@ final class GoogleHealthClient: GoogleHealthServing {
         switch type.defaultQueryStrategy {
         case .dailyRollUp, .rollUp:
             let response = try await dailyRollUpAll(type, interval: range)
-            return GoogleHealthMapper.mapRollupSeries(type, response: response, range: range)
+            return GoogleHealthMapper.mapRollupSeries(type, response: response, range: range, calendar: calendar)
         case .reconcile:
             let response = try await reconcileAll(type, interval: range)
             return GoogleHealthMapper.metricSeries(type, from: response.dataPoints, range: range, calendar: calendar)
@@ -324,6 +334,13 @@ final class GoogleHealthClient: GoogleHealthServing {
     private func intradayInterval(endingAt date: Date) -> DateInterval {
         let start = dayInterval(for: date).start
         return DateInterval(start: start, end: max(start, date))
+    }
+
+    private func dailyRollupInterval(days: Int, endingAt date: Date) -> DateInterval {
+        let currentDay = dayInterval(for: date)
+        let start = calendar.date(byAdding: .day, value: -(days - 1), to: currentDay.start)
+            ?? currentDay.start
+        return DateInterval(start: start, end: currentDay.end)
     }
 
     private func recentInterval(days: Int, endingAt date: Date) -> DateInterval {

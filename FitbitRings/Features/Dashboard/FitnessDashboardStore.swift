@@ -61,7 +61,9 @@ final class FitnessDashboardStore {
             return
         }
 
-        guard sectionStates[section]?.isLoaded != true else {
+        if let state = sectionStates[section],
+           state.isLoaded,
+           Date.now.timeIntervalSince(state.lastUpdated) <= staleAfter {
             return
         }
 

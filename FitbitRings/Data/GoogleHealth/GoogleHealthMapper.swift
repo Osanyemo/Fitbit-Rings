@@ -73,6 +73,7 @@ enum GoogleHealthMapper {
     static func mapActivityData(
         dailyRollups: [GoogleHealthDataType: GoogleHealthRollUpResponse],
         hourlyRollups: [GoogleHealthDataType: GoogleHealthRollUpResponse],
+        currentDayRollups: [GoogleHealthDataType: GoogleHealthRollUpResponse] = [:],
         records: [GoogleHealthDataType: [GoogleHealthDataPoint]] = [:],
         range: DateInterval,
         calendar: Calendar = .current,
@@ -83,7 +84,8 @@ enum GoogleHealthMapper {
             numericSeries(
                 type,
                 from: dailyRollups[type],
-                fallbackRange: range
+                fallbackRange: range,
+                calendar: calendar
             )
         }
         .filter { !$0.points.isEmpty }
@@ -99,13 +101,15 @@ enum GoogleHealthMapper {
             numericSeries(
                 type,
                 from: hourlyRollups[type],
-                fallbackRange: nil
+                fallbackRange: nil,
+                calendar: calendar
             )
         }
         .filter { !$0.points.isEmpty }
 
+        let currentRollups = hourlyRollups.merging(currentDayRollups) { _, current in current }
         upsertCurrentDayRollups(
-            from: hourlyRollups,
+            from: currentRollups,
             into: &dailySeries,
             range: range,
             currentDate: currentDate,
@@ -125,9 +129,10 @@ enum GoogleHealthMapper {
     static func mapRollupSeries(
         _ type: GoogleHealthDataType,
         response: GoogleHealthRollUpResponse,
-        range: DateInterval
+        range: DateInterval,
+        calendar: Calendar = .current
     ) -> NumericMetricSeries {
-        numericSeries(type, from: response, fallbackRange: range)
+        numericSeries(type, from: response, fallbackRange: range, calendar: calendar)
             ?? NumericMetricSeries(type: type, points: [], rangeStart: range.start, rangeEnd: range.end)
     }
 
@@ -242,7 +247,8 @@ enum GoogleHealthMapper {
     private static func numericSeries(
         _ type: GoogleHealthDataType,
         from response: GoogleHealthRollUpResponse?,
-        fallbackRange: DateInterval?
+        fallbackRange: DateInterval?,
+        calendar: Calendar = .current
     ) -> NumericMetricSeries? {
         guard let response else {
             return nil
@@ -254,7 +260,8 @@ enum GoogleHealthMapper {
             }
 
             let startDate = point.startTime
-                ?? fallbackRange.flatMap { fallbackStart(for: $0, index: index) }
+                ?? point.civilStartTime?.dateValue(calendar: calendar)
+                ?? fallbackRange.flatMap { fallbackStart(for: $0, index: index, calendar: calendar) }
             guard let startDate else {
                 return nil
             }
@@ -262,7 +269,7 @@ enum GoogleHealthMapper {
             return NumericMetricPoint(
                 id: "\(type.rawValue)-\(startDate.timeIntervalSince1970)",
                 startDate: startDate,
-                endDate: point.endTime,
+                endDate: point.endTime ?? point.civilEndTime?.dateValue(calendar: calendar),
                 value: value,
                 unit: type.unit
             )
@@ -294,7 +301,7 @@ enum GoogleHealthMapper {
         currentDate: Date,
         calendar: Calendar
     ) {
-        for type in [GoogleHealthDataType.steps, .distance] {
+        for type in GoogleHealthDataType.activitySeriesTypes {
             guard let point = currentDayPoint(
                 for: type,
                 response: hourlyRollups[type],
@@ -451,8 +458,8 @@ enum GoogleHealthMapper {
         }
     }
 
-    private static func fallbackStart(for range: DateInterval, index: Int) -> Date {
-        Calendar.current.date(byAdding: .day, value: index, to: range.start) ?? range.start
+    private static func fallbackStart(for range: DateInterval, index: Int, calendar: Calendar) -> Date {
+        calendar.date(byAdding: .day, value: index, to: range.start) ?? range.start
     }
 
     private static func bucketedSeries(

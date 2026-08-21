@@ -8,6 +8,8 @@ struct GoogleHealthRollUpResponse: Decodable {
 struct GoogleHealthRollupDataPoint: Decodable {
     var startTime: Date? = nil
     var endTime: Date? = nil
+    var civilStartTime: GoogleHealthCivilDateTime? = nil
+    var civilEndTime: GoogleHealthCivilDateTime? = nil
     var steps: GoogleHealthStepsRollup? = nil
     var activeMinutes: GoogleHealthActiveMinutesRollup? = nil
     var activeEnergyBurned: GoogleHealthEnergyRollup? = nil
@@ -475,9 +477,23 @@ struct GoogleHealthCivilTimeInterval: Encodable {
     var end: GoogleHealthCivilDateTime
 }
 
-struct GoogleHealthCivilDateTime: Encodable {
+struct GoogleHealthCivilDateTime: Codable, Hashable, Sendable {
     var date: GoogleHealthCivilDate
     var time: GoogleHealthTimeOfDay?
+
+    func dateValue(calendar: Calendar) -> Date? {
+        calendar.date(
+            from: DateComponents(
+                year: date.year,
+                month: date.month,
+                day: date.day,
+                hour: time?.hours ?? 0,
+                minute: time?.minutes ?? 0,
+                second: time?.seconds ?? 0,
+                nanosecond: time?.nanos ?? 0
+            )
+        )
+    }
 }
 
 struct GoogleHealthCivilDate: Codable, Hashable, Sendable {
@@ -490,7 +506,7 @@ struct GoogleHealthCivilDate: Codable, Hashable, Sendable {
     }
 }
 
-struct GoogleHealthTimeOfDay: Encodable {
+struct GoogleHealthTimeOfDay: Codable, Hashable, Sendable {
     var hours: Int
     var minutes: Int
     var seconds: Int

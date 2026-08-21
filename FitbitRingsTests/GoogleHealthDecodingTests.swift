@@ -7,6 +7,14 @@ final class GoogleHealthDecodingTests: XCTestCase {
         {
           "rollupDataPoints": [
             {
+              "civilStartTime": {
+                "date": { "year": 2026, "month": 8, "day": 21 },
+                "time": { "hours": 0, "minutes": 0, "seconds": 0 }
+              },
+              "civilEndTime": {
+                "date": { "year": 2026, "month": 8, "day": 22 },
+                "time": { "hours": 0, "minutes": 0, "seconds": 0 }
+              },
               "steps": { "countSum": "382" },
               "activeMinutes": {
                 "activeMinutesRollupByActivityLevel": [
@@ -27,7 +35,11 @@ final class GoogleHealthDecodingTests: XCTestCase {
             from: json
         )
         let point = try XCTUnwrap(decoded.rollupDataPoints.first)
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
 
+        XCTAssertEqual(point.civilStartTime?.dateValue(calendar: calendar), calendar.date(from: DateComponents(year: 2026, month: 8, day: 21)))
+        XCTAssertEqual(point.civilEndTime?.dateValue(calendar: calendar), calendar.date(from: DateComponents(year: 2026, month: 8, day: 22)))
         XCTAssertEqual(point.steps?.countSum?.intValue, 382)
         XCTAssertEqual(
             point.activeMinutes?.activeMinutesRollupByActivityLevel.compactMap { $0.activeMinutesSum?.intValue },
@@ -329,6 +341,86 @@ final class GoogleHealthDecodingTests: XCTestCase {
         XCTAssertEqual(distance.latestPoint?.value, 3_200)
     }
 
+    func testActivityMapperUpsertsCurrentDayActiveCaloriesAndMinutes() throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+
+        let currentDate = calendar.date(from: DateComponents(year: 2026, month: 8, day: 21, hour: 16))!
+        let previousDay = calendar.date(from: DateComponents(year: 2026, month: 8, day: 20))!
+        let range = DateInterval(
+            start: calendar.date(byAdding: .day, value: -13, to: calendar.startOfDay(for: currentDate))!,
+            end: currentDate
+        )
+
+        let activityData = GoogleHealthMapper.mapActivityData(
+            dailyRollups: [
+                .activeEnergyBurned: GoogleHealthRollUpResponse(
+                    rollupDataPoints: [
+                        GoogleHealthRollupDataPoint(
+                            startTime: previousDay,
+                            activeEnergyBurned: GoogleHealthEnergyRollup(kcalSum: 365)
+                        )
+                    ]
+                ),
+                .activeMinutes: GoogleHealthRollUpResponse(
+                    rollupDataPoints: [
+                        GoogleHealthRollupDataPoint(
+                            startTime: previousDay,
+                            activeMinutes: GoogleHealthActiveMinutesRollup(
+                                activeMinutesRollupByActivityLevel: [
+                                    GoogleHealthActiveMinutesByActivityLevel(
+                                        activityLevel: "LIGHT",
+                                        activeMinutesSum: GoogleHealthNumericValue(20)
+                                    )
+                                ]
+                            )
+                        )
+                    ]
+                )
+            ],
+            hourlyRollups: [:],
+            currentDayRollups: [
+                .activeEnergyBurned: GoogleHealthRollUpResponse(
+                    rollupDataPoints: [
+                        GoogleHealthRollupDataPoint(
+                            activeEnergyBurned: GoogleHealthEnergyRollup(kcalSum: 210)
+                        )
+                    ]
+                ),
+                .activeMinutes: GoogleHealthRollUpResponse(
+                    rollupDataPoints: [
+                        GoogleHealthRollupDataPoint(
+                            activeMinutes: GoogleHealthActiveMinutesRollup(
+                                activeMinutesRollupByActivityLevel: [
+                                    GoogleHealthActiveMinutesByActivityLevel(
+                                        activityLevel: "LIGHT",
+                                        activeMinutesSum: GoogleHealthNumericValue(12)
+                                    ),
+                                    GoogleHealthActiveMinutesByActivityLevel(
+                                        activityLevel: "VIGOROUS",
+                                        activeMinutesSum: GoogleHealthNumericValue(8)
+                                    )
+                                ]
+                            )
+                        )
+                    ]
+                )
+            ],
+            range: range,
+            calendar: calendar,
+            currentDate: currentDate
+        )
+
+        let today = calendar.startOfDay(for: currentDate)
+        let activeCalories = try XCTUnwrap(activityData.series(for: .activeEnergyBurned))
+        let activeMinutes = try XCTUnwrap(activityData.series(for: .activeMinutes))
+
+        XCTAssertEqual(activeCalories.latestPoint?.startDate, today)
+        XCTAssertEqual(activeCalories.latestPoint?.value, 210)
+        XCTAssertEqual(activeMinutes.latestPoint?.startDate, today)
+        XCTAssertEqual(activeMinutes.latestPoint?.value, 20)
+    }
+
     func testActivityMapperReplacesExistingCurrentDayDistancePoint() throws {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(secondsFromGMT: 0)!
@@ -614,6 +706,15 @@ final class GoogleHealthDecodingTests: XCTestCase {
         _ = try await client.fetchActivityData(date: date)
 
         let requests = httpClient.recordedRequests()
+        let dailySteps = try XCTUnwrap(
+            requests.first { $0.url?.path == "/v4/users/me/dataTypes/steps/dataPoints:dailyRollUp" }
+        )
+        let dailyBody = String(data: try XCTUnwrap(dailySteps.httpBody), encoding: .utf8)
+        XCTAssertTrue(dailyBody?.contains("\"windowSizeDays\":1") == true)
+        XCTAssertTrue(dailyBody?.contains("\"day\":7") == true)
+        XCTAssertTrue(dailyBody?.contains("\"day\":21") == true)
+        XCTAssertFalse(dailyBody?.contains("dataSourceFamily") == true)
+
         let hourlySteps = try XCTUnwrap(
             requests.first { $0.url?.path == "/v4/users/me/dataTypes/steps/dataPoints:rollUp" }
         )
@@ -633,6 +734,18 @@ final class GoogleHealthDecodingTests: XCTestCase {
         XCTAssertTrue(hourlyDistanceBody?.contains("\"startTime\":\"\(expectedStartTime)\"") == true)
         XCTAssertTrue(hourlyDistanceBody?.contains("\"endTime\":\"\(expectedEndTime)\"") == true)
         XCTAssertFalse(hourlyDistanceBody?.contains("dataSourceFamily") == true)
+
+        let activeCaloriesToday = try XCTUnwrap(
+            requests.first { $0.url?.path == "/v4/users/me/dataTypes/active-energy-burned/dataPoints:rollUp" }
+        )
+        let activeCaloriesTodayBody = String(
+            data: try XCTUnwrap(activeCaloriesToday.httpBody),
+            encoding: .utf8
+        )
+        XCTAssertTrue(activeCaloriesTodayBody?.contains("\"windowSize\":\"86400s\"") == true)
+        XCTAssertTrue(activeCaloriesTodayBody?.contains("\"startTime\":\"\(expectedStartTime)\"") == true)
+        XCTAssertTrue(activeCaloriesTodayBody?.contains("\"endTime\":\"\(expectedEndTime)\"") == true)
+        XCTAssertFalse(activeCaloriesTodayBody?.contains("dataSourceFamily") == true)
 
         let activityLevel = try XCTUnwrap(
             requests.first { $0.url?.path == "/v4/users/me/dataTypes/activity-level/dataPoints:reconcile" }
