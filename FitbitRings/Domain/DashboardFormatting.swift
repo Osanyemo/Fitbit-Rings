@@ -51,4 +51,33 @@ enum DashboardFormatting {
         formatter.unitsStyle = .full
         return "Updated \(formatter.localizedString(for: date, relativeTo: .now))"
     }
+
+    static func compactUpdate(_ date: Date, relativeTo now: Date = .now) -> String {
+        let age = compactUpdateAge(date, relativeTo: now)
+        return age == "Not synced" ? age : "Updated \(age)"
+    }
+
+    static func compactUpdateAge(_ date: Date, relativeTo now: Date = .now) -> String {
+        guard date > .distantPast else { return "Not synced" }
+
+        let elapsed = max(0, now.timeIntervalSince(date))
+
+        if elapsed < 60 {
+            return "just now"
+        }
+
+        if elapsed < 3_600 {
+            return "\(Int(elapsed / 60))m ago"
+        }
+
+        if elapsed < 86_400 {
+            return "\(Int(elapsed / 3_600))h ago"
+        }
+
+        if elapsed < 604_800 {
+            return "\(Int(elapsed / 86_400))d ago"
+        }
+
+        return date.formatted(date: .abbreviated, time: .omitted)
+    }
 }

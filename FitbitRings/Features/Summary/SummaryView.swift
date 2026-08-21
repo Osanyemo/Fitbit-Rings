@@ -106,6 +106,7 @@ private struct SyncPill: View {
             icon
             Text(title)
                 .lineLimit(1)
+                .minimumScaleFactor(0.75)
         }
         .font(.caption.weight(.bold))
         .foregroundStyle(foregroundStyle)
@@ -135,20 +136,24 @@ private struct SyncPill: View {
     private var title: String {
         switch syncState {
         case .refreshing:
-            return "Syncing"
+            return lastUpdated > .distantPast
+                ? "Updating - \(DashboardFormatting.compactUpdateAge(lastUpdated))"
+                : "Updating"
         case .failed:
-            return "Issue"
+            return lastUpdated > .distantPast
+                ? "Issue - \(DashboardFormatting.compactUpdateAge(lastUpdated))"
+                : "Issue"
         case .idle:
-            return lastUpdated > .distantPast ? "Synced" : "New"
+            return DashboardFormatting.compactUpdate(lastUpdated)
         }
     }
 
     private var accessibilityText: String {
         switch syncState {
         case .refreshing:
-            return "Refreshing dashboard"
+            return "Refreshing dashboard. \(DashboardFormatting.relativeUpdate(lastUpdated))"
         case .failed:
-            return "Dashboard refresh failed"
+            return "Dashboard refresh failed. \(DashboardFormatting.relativeUpdate(lastUpdated))"
         case .idle:
             return DashboardFormatting.relativeUpdate(lastUpdated)
         }

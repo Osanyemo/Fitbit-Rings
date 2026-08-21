@@ -6,18 +6,20 @@ import SwiftUI
 final class SummaryViewModel {
     private let repository: DashboardRepository
     private let cache: DashboardCaching
-    private let staleAfter: TimeInterval = 5 * 60
+    private let staleAfter: TimeInterval
+    private var isRefreshing = false
 
     var snapshot: DashboardSnapshot
     var preferences: DashboardPreferences
     var errorMessage: String?
 
-    init(repository: DashboardRepository, cache: DashboardCaching) {
+    init(repository: DashboardRepository, cache: DashboardCaching, staleAfter: TimeInterval = 60) {
         let cachedPreferences = cache.loadPreferences()
         let cachedSnapshot = cache.loadDashboard()
 
         self.repository = repository
         self.cache = cache
+        self.staleAfter = staleAfter
         preferences = cachedPreferences
         snapshot = cachedSnapshot ?? .empty(goals: cachedPreferences.goals)
     }
@@ -26,29 +28,37 @@ final class SummaryViewModel {
         preferences = cache.loadPreferences()
         if let cached = cache.loadDashboard() {
             snapshot = cached
+        } else if snapshot.lastUpdated == .distantPast {
+            snapshot = .empty(goals: preferences.goals)
         }
         await refreshIfStale()
     }
 
-    func refreshIfStale() async {
-        guard Date().timeIntervalSince(snapshot.lastUpdated) > staleAfter else {
+    func refreshIfStale(now: Date = .now) async {
+        guard now.timeIntervalSince(snapshot.lastUpdated) > staleAfter else {
             return
         }
         await refresh()
     }
 
     func refresh() async {
+        guard !isRefreshing else { return }
+
+        isRefreshing = true
+        defer { isRefreshing = false }
+
         errorMessage = nil
-        snapshot.syncState = .refreshing
 
         do {
             preferences = cache.loadPreferences()
+
             withAnimation(.snappy(duration: 0.35)) {
-                snapshot = DashboardSnapshot.empty(goals: preferences.goals)
                 if let cached = cache.loadDashboard() {
                     snapshot = cached
-                    snapshot.syncState = .refreshing
+                } else if snapshot.lastUpdated == .distantPast {
+                    snapshot = .empty(goals: preferences.goals)
                 }
+                snapshot.syncState = .refreshing
             }
 
             let fresh = try await repository.refresh()
