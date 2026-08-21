@@ -248,6 +248,183 @@ final class GoogleHealthDecodingTests: XCTestCase {
         XCTAssertFalse(activityData.isEmpty)
     }
 
+    func testActivityMapperUpsertsCurrentDayStepsAndDistanceFromHourlyRollups() throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+
+        let currentDate = calendar.date(from: DateComponents(year: 2026, month: 8, day: 21, hour: 15, minute: 39))!
+        let previousDay = calendar.date(from: DateComponents(year: 2026, month: 8, day: 20))!
+        let firstHour = calendar.date(from: DateComponents(year: 2026, month: 8, day: 21, hour: 8))!
+        let secondHour = calendar.date(from: DateComponents(year: 2026, month: 8, day: 21, hour: 9))!
+        let range = DateInterval(
+            start: calendar.date(byAdding: .day, value: -14, to: currentDate)!,
+            end: currentDate
+        )
+
+        let activityData = GoogleHealthMapper.mapActivityData(
+            dailyRollups: [
+                .steps: GoogleHealthRollUpResponse(
+                    rollupDataPoints: [
+                        GoogleHealthRollupDataPoint(
+                            startTime: previousDay,
+                            steps: GoogleHealthStepsRollup(countSum: GoogleHealthNumericValue(8_000))
+                        )
+                    ]
+                ),
+                .distance: GoogleHealthRollUpResponse(
+                    rollupDataPoints: [
+                        GoogleHealthRollupDataPoint(
+                            startTime: previousDay,
+                            distance: GoogleHealthDistanceRollup(
+                                millimetersSum: GoogleHealthNumericValue(5_150_000)
+                            )
+                        )
+                    ]
+                )
+            ],
+            hourlyRollups: [
+                .steps: GoogleHealthRollUpResponse(
+                    rollupDataPoints: [
+                        GoogleHealthRollupDataPoint(
+                            startTime: firstHour,
+                            steps: GoogleHealthStepsRollup(countSum: GoogleHealthNumericValue(700))
+                        ),
+                        GoogleHealthRollupDataPoint(
+                            startTime: secondHour,
+                            steps: GoogleHealthStepsRollup(countSum: GoogleHealthNumericValue(550))
+                        )
+                    ]
+                ),
+                .distance: GoogleHealthRollUpResponse(
+                    rollupDataPoints: [
+                        GoogleHealthRollupDataPoint(
+                            startTime: firstHour,
+                            distance: GoogleHealthDistanceRollup(
+                                millimetersSum: GoogleHealthNumericValue(1_200_000)
+                            )
+                        ),
+                        GoogleHealthRollupDataPoint(
+                            startTime: secondHour,
+                            distance: GoogleHealthDistanceRollup(
+                                millimetersSum: GoogleHealthNumericValue(2_000_000)
+                            )
+                        )
+                    ]
+                )
+            ],
+            range: range,
+            calendar: calendar,
+            currentDate: currentDate,
+            loadedAt: currentDate
+        )
+
+        let today = calendar.startOfDay(for: currentDate)
+        let steps = try XCTUnwrap(activityData.series(for: .steps))
+        let distance = try XCTUnwrap(activityData.series(for: .distance))
+
+        XCTAssertEqual(steps.latestPoint?.startDate, today)
+        XCTAssertEqual(steps.latestPoint?.value, 1_250)
+        XCTAssertEqual(distance.latestPoint?.startDate, today)
+        XCTAssertEqual(distance.latestPoint?.endDate, currentDate)
+        XCTAssertEqual(distance.latestPoint?.value, 3_200)
+    }
+
+    func testActivityMapperReplacesExistingCurrentDayDistancePoint() throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+
+        let currentDate = calendar.date(from: DateComponents(year: 2026, month: 8, day: 21, hour: 15))!
+        let dailyCurrentPoint = calendar.date(from: DateComponents(year: 2026, month: 8, day: 21, hour: 1))!
+        let hourlyPoint = calendar.date(from: DateComponents(year: 2026, month: 8, day: 21, hour: 12))!
+        let range = DateInterval(
+            start: calendar.date(byAdding: .day, value: -14, to: currentDate)!,
+            end: currentDate
+        )
+
+        let activityData = GoogleHealthMapper.mapActivityData(
+            dailyRollups: [
+                .distance: GoogleHealthRollUpResponse(
+                    rollupDataPoints: [
+                        GoogleHealthRollupDataPoint(
+                            startTime: dailyCurrentPoint,
+                            distance: GoogleHealthDistanceRollup(
+                                millimetersSum: GoogleHealthNumericValue(8_000_000)
+                            )
+                        )
+                    ]
+                )
+            ],
+            hourlyRollups: [
+                .distance: GoogleHealthRollUpResponse(
+                    rollupDataPoints: [
+                        GoogleHealthRollupDataPoint(
+                            startTime: hourlyPoint,
+                            distance: GoogleHealthDistanceRollup(
+                                millimetersSum: GoogleHealthNumericValue(1_200_000)
+                            )
+                        )
+                    ]
+                )
+            ],
+            range: range,
+            calendar: calendar,
+            currentDate: currentDate
+        )
+
+        let distance = try XCTUnwrap(activityData.series(for: .distance))
+        let currentDayPoints = distance.points.filter {
+            calendar.isDate($0.startDate, inSameDayAs: currentDate)
+        }
+
+        XCTAssertEqual(currentDayPoints.count, 1)
+        XCTAssertEqual(currentDayPoints.first?.startDate, calendar.startOfDay(for: currentDate))
+        XCTAssertEqual(currentDayPoints.first?.value, 1_200)
+    }
+
+    func testActivityMapperKeepsCurrentDayZeroDistanceButSkipsMissingBuckets() throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+
+        let currentDate = calendar.date(from: DateComponents(year: 2026, month: 8, day: 21, hour: 15))!
+        let hourlyPoint = calendar.date(from: DateComponents(year: 2026, month: 8, day: 21, hour: 12))!
+        let range = DateInterval(
+            start: calendar.date(byAdding: .day, value: -14, to: currentDate)!,
+            end: currentDate
+        )
+
+        let zeroDistance = GoogleHealthMapper.mapActivityData(
+            dailyRollups: [:],
+            hourlyRollups: [
+                .distance: GoogleHealthRollUpResponse(
+                    rollupDataPoints: [
+                        GoogleHealthRollupDataPoint(
+                            startTime: hourlyPoint,
+                            distance: GoogleHealthDistanceRollup(millimetersSum: GoogleHealthNumericValue(0))
+                        )
+                    ]
+                )
+            ],
+            range: range,
+            calendar: calendar,
+            currentDate: currentDate
+        )
+
+        let distance = try XCTUnwrap(zeroDistance.series(for: .distance))
+        XCTAssertEqual(distance.points.count, 1)
+        XCTAssertEqual(distance.latestPoint?.value, 0)
+        XCTAssertFalse(zeroDistance.isEmpty)
+
+        let missingDistance = GoogleHealthMapper.mapActivityData(
+            dailyRollups: [:],
+            hourlyRollups: [.distance: GoogleHealthRollUpResponse(rollupDataPoints: [])],
+            range: range,
+            calendar: calendar,
+            currentDate: currentDate
+        )
+
+        XCTAssertNil(missingDistance.series(for: .distance))
+    }
+
     func testActivityMapperDecodesAndMapsSupportedRollupMetrics() throws {
         let json = """
         {
@@ -441,7 +618,21 @@ final class GoogleHealthDecodingTests: XCTestCase {
             requests.first { $0.url?.path == "/v4/users/me/dataTypes/steps/dataPoints:rollUp" }
         )
         let hourlyBody = String(data: try XCTUnwrap(hourlySteps.httpBody), encoding: .utf8)
+        let expectedStartTime = ISO8601DateFormatter.googleHealth.string(from: calendar.startOfDay(for: date))
+        let expectedEndTime = ISO8601DateFormatter.googleHealth.string(from: date)
         XCTAssertTrue(hourlyBody?.contains("\"windowSize\":\"3600s\"") == true)
+        XCTAssertTrue(hourlyBody?.contains("\"startTime\":\"\(expectedStartTime)\"") == true)
+        XCTAssertTrue(hourlyBody?.contains("\"endTime\":\"\(expectedEndTime)\"") == true)
+        XCTAssertFalse(hourlyBody?.contains("dataSourceFamily") == true)
+
+        let hourlyDistance = try XCTUnwrap(
+            requests.first { $0.url?.path == "/v4/users/me/dataTypes/distance/dataPoints:rollUp" }
+        )
+        let hourlyDistanceBody = String(data: try XCTUnwrap(hourlyDistance.httpBody), encoding: .utf8)
+        XCTAssertTrue(hourlyDistanceBody?.contains("\"windowSize\":\"3600s\"") == true)
+        XCTAssertTrue(hourlyDistanceBody?.contains("\"startTime\":\"\(expectedStartTime)\"") == true)
+        XCTAssertTrue(hourlyDistanceBody?.contains("\"endTime\":\"\(expectedEndTime)\"") == true)
+        XCTAssertFalse(hourlyDistanceBody?.contains("dataSourceFamily") == true)
 
         let activityLevel = try XCTUnwrap(
             requests.first { $0.url?.path == "/v4/users/me/dataTypes/activity-level/dataPoints:reconcile" }

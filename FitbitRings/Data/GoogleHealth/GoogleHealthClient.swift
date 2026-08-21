@@ -76,7 +76,7 @@ final class GoogleHealthClient: GoogleHealthServing {
 
     func fetchActivityData(date: Date) async throws -> ActivityDashboardData {
         let range = recentInterval(days: 14, endingAt: date)
-        let today = dayInterval(for: date)
+        let todaySoFar = intradayInterval(endingAt: date)
 
         var dailyRollups: [GoogleHealthDataType: GoogleHealthRollUpResponse] = [:]
         var hourlyRollups: [GoogleHealthDataType: GoogleHealthRollUpResponse] = [:]
@@ -89,7 +89,7 @@ final class GoogleHealthClient: GoogleHealthServing {
         }
 
         for type in [GoogleHealthDataType.steps, .distance] {
-            if let response = try await optionalData({ try await rollUpAll(type, interval: today, windowSize: "3600s") }) {
+            if let response = try await optionalData({ try await rollUpAll(type, interval: todaySoFar, windowSize: "3600s") }) {
                 hourlyRollups[type] = response
             }
         }
@@ -105,7 +105,8 @@ final class GoogleHealthClient: GoogleHealthServing {
             hourlyRollups: hourlyRollups,
             records: records,
             range: range,
-            calendar: calendar
+            calendar: calendar,
+            currentDate: date
         )
     }
 
@@ -318,6 +319,11 @@ final class GoogleHealthClient: GoogleHealthServing {
 
     private func dayInterval(for date: Date) -> DateInterval {
         calendar.dateInterval(of: .day, for: date) ?? DateInterval(start: date, duration: 86_400)
+    }
+
+    private func intradayInterval(endingAt date: Date) -> DateInterval {
+        let start = dayInterval(for: date).start
+        return DateInterval(start: start, end: max(start, date))
     }
 
     private func recentInterval(days: Int, endingAt date: Date) -> DateInterval {

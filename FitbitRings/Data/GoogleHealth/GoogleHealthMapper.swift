@@ -76,6 +76,7 @@ enum GoogleHealthMapper {
         records: [GoogleHealthDataType: [GoogleHealthDataPoint]] = [:],
         range: DateInterval,
         calendar: Calendar = .current,
+        currentDate: Date = .now,
         loadedAt: Date = .now
     ) -> ActivityDashboardData {
         var dailySeries = GoogleHealthDataType.activitySeriesTypes.compactMap { type in
@@ -102,6 +103,14 @@ enum GoogleHealthMapper {
             )
         }
         .filter { !$0.points.isEmpty }
+
+        upsertCurrentDayRollups(
+            from: hourlyRollups,
+            into: &dailySeries,
+            range: range,
+            currentDate: currentDate,
+            calendar: calendar
+        )
 
         let bucketedSeries = bucketedSeries(from: dailyRollups, range: range)
 
@@ -275,6 +284,89 @@ enum GoogleHealthMapper {
             rangeStart: fallbackRange?.start ?? points.first?.startDate,
             rangeEnd: fallbackRange?.end ?? points.last?.endDate,
             nextPageToken: response.nextPageToken
+        )
+    }
+
+    private static func upsertCurrentDayRollups(
+        from hourlyRollups: [GoogleHealthDataType: GoogleHealthRollUpResponse],
+        into dailySeries: inout [NumericMetricSeries],
+        range: DateInterval,
+        currentDate: Date,
+        calendar: Calendar
+    ) {
+        for type in [GoogleHealthDataType.steps, .distance] {
+            guard let point = currentDayPoint(
+                for: type,
+                response: hourlyRollups[type],
+                currentDate: currentDate,
+                calendar: calendar
+            ) else { continue }
+
+            if let seriesIndex = dailySeries.firstIndex(where: { $0.type == type }) {
+                dailySeries[seriesIndex] = upsertingCurrentDayPoint(
+                    point,
+                    in: dailySeries[seriesIndex],
+                    calendar: calendar
+                )
+            } else {
+                dailySeries.append(
+                    NumericMetricSeries(
+                        type: type,
+                        points: [point],
+                        rangeStart: range.start,
+                        rangeEnd: range.end
+                    )
+                )
+            }
+        }
+    }
+
+    private static func currentDayPoint(
+        for type: GoogleHealthDataType,
+        response: GoogleHealthRollUpResponse?,
+        currentDate: Date,
+        calendar: Calendar
+    ) -> NumericMetricPoint? {
+        guard let response else { return nil }
+
+        let values = response.rollupDataPoints.compactMap { point -> Double? in
+            if let startTime = point.startTime,
+               !calendar.isDate(startTime, inSameDayAs: currentDate) {
+                return nil
+            }
+            return rollupValue(type, in: point)
+        }
+
+        guard !values.isEmpty else { return nil }
+
+        let dayStart = calendar.startOfDay(for: currentDate)
+        return NumericMetricPoint(
+            id: "\(type.rawValue)-\(dayStart.timeIntervalSince1970)",
+            startDate: dayStart,
+            endDate: currentDate,
+            value: values.reduce(0, +),
+            unit: type.unit
+        )
+    }
+
+    private static func upsertingCurrentDayPoint(
+        _ point: NumericMetricPoint,
+        in series: NumericMetricSeries,
+        calendar: Calendar
+    ) -> NumericMetricSeries {
+        var points = series.points.filter {
+            !calendar.isDate($0.startDate, inSameDayAs: point.startDate)
+        }
+        points.append(point)
+
+        return NumericMetricSeries(
+            type: series.type,
+            title: series.title,
+            unit: series.unit,
+            points: points,
+            rangeStart: series.rangeStart,
+            rangeEnd: series.rangeEnd,
+            nextPageToken: series.nextPageToken
         )
     }
 
