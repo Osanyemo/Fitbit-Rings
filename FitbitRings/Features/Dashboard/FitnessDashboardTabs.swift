@@ -146,12 +146,15 @@ private struct ActivityTabView: View {
             }
         ) {
             VStack(alignment: .leading, spacing: 24) {
-                ActivityRingsCard(snapshot: store.snapshot.summary)
-
-                RingGoalProgress(rings: store.snapshot.summary.rings)
+                ActivityTodayFocusSection(
+                    snapshot: store.snapshot.summary,
+                    onSelectMetric: { type in
+                        store.route(to: .metric(type))
+                    }
+                )
 
                 DashboardSeriesSection(
-                    title: "14 Days",
+                    title: "14-Day Trends",
                     series: store.snapshot.activity.dailySeries,
                     units: store.preferences.units,
                     onSelectMetric: { type in
@@ -508,22 +511,276 @@ private struct DashboardLargeHeader: View {
     }
 }
 
-private struct ActivityRingsCard: View {
+private struct ActivityTodayFocusSection: View {
     let snapshot: DashboardSnapshot
+    let onSelectMetric: (GoogleHealthDataType) -> Void
+
+    private let columns = [
+        GridItem(.adaptive(minimum: 106), spacing: 14)
+    ]
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            ActivityRingsView(rings: snapshot.rings)
-                .frame(maxWidth: .infinity)
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .center, spacing: 12) {
+                Text("Today Focus")
+                    .font(.title2.weight(.bold))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.78)
 
-            RingGoalProgress(rings: snapshot.rings)
+                Spacer(minLength: 0)
+
+                ActivityStatusPill(text: goalStatusText)
+            }
+
+            DashboardMetricCard(
+                title: primaryTitle,
+                value: primaryInsight.primaryValue,
+                unit: primaryInsight.primaryUnit,
+                subtitle: primarySubtitle,
+                systemImage: primaryInsight.systemImage,
+                accentColor: primaryInsight.accentColor,
+                isAvailable: primaryInsight.isAvailable
+            ) {
+                onSelectMetric(primaryInsight.dataType)
+            }
+
+            LazyVGrid(columns: columns, spacing: 14) {
+                ForEach(goalInsights) { insight in
+                    Button {
+                        onSelectMetric(insight.dataType)
+                    } label: {
+                        ActivityGoalTile(insight: insight)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
         }
-        .padding(16)
-        .background(.summarySurface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+    }
+
+    private var primaryTitle: String {
+        guard primaryInsight.isAvailable else {
+            return "Waiting for Activity"
+        }
+
+        return allAvailableGoalsClosed ? "Goals Closed" : "Next Goal"
+    }
+
+    private var primarySubtitle: String {
+        allAvailableGoalsClosed
+            ? "Move, exercise, and steps are complete"
+            : primaryInsight.primarySubtitle
+    }
+
+    private var allAvailableGoalsClosed: Bool {
+        let availableGoals = goalInsights.filter(\.isAvailable)
+        return !availableGoals.isEmpty && availableGoals.allSatisfy(\.isComplete)
+    }
+
+    private var primaryInsight: ActivityGoalInsight {
+        goalInsights
+            .filter { $0.isAvailable && !$0.isComplete }
+            .min { $0.progress < $1.progress }
+            ?? goalInsights.first { $0.isAvailable }
+            ?? goalInsights[0]
+    }
+
+    private var goalStatusText: String {
+        let availableGoals = goalInsights.filter(\.isAvailable)
+        guard !availableGoals.isEmpty else {
+            return "No data"
+        }
+
+        let closedCount = availableGoals.filter(\.isComplete).count
+        return "\(closedCount)/\(availableGoals.count) closed"
+    }
+
+    private var goalInsights: [ActivityGoalInsight] {
+        [
+            ActivityGoalInsight(
+                title: "Move",
+                metric: snapshot.rings.move,
+                displayUnit: "kcal",
+                dataType: .activeEnergyBurned,
+                systemImage: "flame.fill",
+                accentColor: .moveRing,
+                isAvailable: snapshot.activity.hasData(for: .activeEnergyBurned)
+            ),
+            ActivityGoalInsight(
+                title: "Exercise",
+                metric: snapshot.rings.active,
+                displayUnit: "min",
+                dataType: .activeMinutes,
+                systemImage: "figure.run",
+                accentColor: .activeRing,
+                isAvailable: snapshot.activity.hasData(for: .activeMinutes)
+            ),
+            ActivityGoalInsight(
+                title: "Steps",
+                metric: snapshot.rings.steps,
+                displayUnit: "steps",
+                dataType: .steps,
+                systemImage: "shoeprints.fill",
+                accentColor: .stepsRing,
+                isAvailable: snapshot.activity.hasData(for: .steps)
+            )
+        ]
+    }
+}
+
+private struct ActivityGoalInsight: Identifiable {
+    var id: GoogleHealthDataType { dataType }
+
+    let title: String
+    let value: String
+    let unit: String
+    let primaryValue: String
+    let primaryUnit: String
+    let subtitle: String
+    let primarySubtitle: String
+    let progressText: String
+    let progress: Double
+    let dataType: GoogleHealthDataType
+    let systemImage: String
+    let accentColor: Color
+    let isAvailable: Bool
+    let isComplete: Bool
+
+    init(
+        title: String,
+        metric: RingMetric,
+        displayUnit: String,
+        dataType: GoogleHealthDataType,
+        systemImage: String,
+        accentColor: Color,
+        isAvailable: Bool
+    ) {
+        self.title = title
+        self.dataType = dataType
+        self.systemImage = systemImage
+        self.accentColor = accentColor
+        self.isAvailable = isAvailable
+        progress = metric.progress
+        isComplete = isAvailable && metric.progress >= 1
+
+        let logged = DashboardFormatting.integer(metric.value)
+        let goal = DashboardFormatting.integer(metric.goal)
+        let remaining = DashboardFormatting.integer(max(0, metric.goal - metric.value))
+        progressText = DashboardFormatting.percent(metric.progress)
+
+        if !isAvailable {
+            value = "No data"
+            unit = ""
+            primaryValue = "No data"
+            primaryUnit = ""
+            subtitle = "Not available today"
+            primarySubtitle = "\(title) has not synced yet"
+        } else if isComplete {
+            value = "Closed"
+            unit = ""
+            primaryValue = "Closed"
+            primaryUnit = ""
+            subtitle = "\(logged) of \(goal) \(displayUnit)"
+            primarySubtitle = "\(title) is \(progressText) complete"
+        } else {
+            value = remaining
+            unit = "\(displayUnit) left"
+            primaryValue = remaining
+            primaryUnit = "\(displayUnit) left"
+            subtitle = "\(logged) of \(goal) \(displayUnit)"
+            primarySubtitle = "\(title) is \(progressText) complete"
+        }
+    }
+}
+
+private struct ActivityStatusPill: View {
+    let text: String
+
+    var body: some View {
+        Text(text)
+            .font(.caption.weight(.bold).monospacedDigit())
+            .foregroundStyle(.secondary)
+            .lineLimit(1)
+            .minimumScaleFactor(0.76)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(.dashboardTintSurface, in: Capsule())
+            .overlay {
+                Capsule()
+                    .stroke(.dashboardStroke, lineWidth: 1)
+            }
+    }
+}
+
+private struct ActivityGoalTile: View {
+    let insight: ActivityGoalInsight
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 8) {
+                Image(systemName: insight.systemImage)
+                    .font(.caption.weight(.bold))
+                    .symbolRenderingMode(.hierarchical)
+                    .foregroundStyle(insight.accentColor)
+                    .frame(width: 26, height: 26)
+                    .background(insight.accentColor.opacity(0.15), in: Circle())
+
+                Text(insight.title)
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.72)
+            }
+
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(alignment: .lastTextBaseline, spacing: 3) {
+                    Text(insight.value)
+                        .font(.system(size: 20, weight: .bold, design: .rounded))
+                        .monospacedDigit()
+                        .foregroundStyle(insight.isAvailable ? Color.primary : Color.secondary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.48)
+                        .allowsTightening(true)
+
+                    if !insight.unit.isEmpty {
+                        Text(insight.unit)
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.62)
+                    }
+                }
+
+                Text(insight.subtitle)
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.72)
+            }
+
+            Spacer(minLength: 0)
+
+            if insight.isAvailable {
+                ProgressView(value: min(max(insight.progress, 0), 1))
+                    .tint(insight.accentColor)
+                    .accessibilityLabel("\(insight.title) \(insight.progressText)")
+            }
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, minHeight: 142, alignment: .topLeading)
+        .background(tileBackground, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .stroke(.dashboardStroke, lineWidth: 1)
+                .stroke(tileBorder, lineWidth: 1)
         }
+        .accessibilityElement(children: .combine)
+    }
+
+    private var tileBackground: Color {
+        insight.isComplete ? insight.accentColor.opacity(0.16) : Color.summarySurface
+    }
+
+    private var tileBorder: Color {
+        insight.isComplete ? insight.accentColor.opacity(0.20) : Color.dashboardStroke
     }
 }
 
