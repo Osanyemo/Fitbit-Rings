@@ -1,64 +1,88 @@
 import SwiftUI
 
 struct SummaryView: View {
-    @Bindable var viewModel: SummaryViewModel
+    @Bindable var store: FitnessDashboardStore
     let accountEmail: String?
     let onSignOut: () -> Void
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var showingSettings = false
 
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                LazyVStack(alignment: .leading, spacing: 0) {
-                    ActivityTopBand(
-                        snapshot: viewModel.snapshot,
-                        onSettings: {
-                            showingSettings = true
+        ScrollView {
+            LazyVStack(alignment: .leading, spacing: 0) {
+                ActivityTopBand(
+                    snapshot: store.snapshot.summary,
+                    accountEmail: accountEmail,
+                    onSettings: {
+                        showingSettings = true
+                    }
+                )
+
+                VStack(alignment: .leading, spacing: 30) {
+                    if let errorMessage = store.errorMessage {
+                        SyncStatusBanner(errorMessage: errorMessage)
+                    }
+
+                    SummaryHourlyPairSection(
+                        snapshot: store.snapshot,
+                        units: store.preferences.units,
+                        onSelectMetric: { type in
+                            store.route(to: .metric(type))
                         }
                     )
 
-                    VStack(alignment: .leading, spacing: 30) {
-                        if let errorMessage = viewModel.errorMessage {
-                            SyncStatusBanner(errorMessage: errorMessage)
-                        }
-
-                        TodayGoalsSection(
-                            snapshot: viewModel.snapshot,
-                            units: viewModel.preferences.units
+                    if let latestWorkout = store.snapshot.summary.latestWorkout {
+                        RecentWorkoutSection(
+                            workout: latestWorkout,
+                            units: store.preferences.units,
+                            onSelect: {
+                                if let workoutID = store.workoutID(matching: latestWorkout) {
+                                    store.route(to: .workout(workoutID))
+                                } else {
+                                    store.selectedTab = .workouts
+                                }
+                            }
                         )
-
-                        if let latestWorkout = viewModel.snapshot.latestWorkout {
-                            RecentWorkoutSection(
-                                workout: latestWorkout,
-                                units: viewModel.preferences.units
-                            )
-                        }
                     }
-                    .padding(.horizontal, 20)
-                    .padding(.top, 26)
-                    .padding(.bottom, 38)
+
+                    TodayGoalsSection(
+                        snapshot: store.snapshot.summary,
+                        units: store.preferences.units,
+                        onMetricSelected: { type in
+                            if type == .sleep,
+                               let sleepID = store.snapshot.health.sleepSessions.first?.id {
+                                store.route(to: .sleep(sleepID))
+                            } else {
+                                store.route(to: .metric(type))
+                            }
+                        }
+                    )
                 }
-            }
-            .scrollIndicators(.hidden)
-            .background {
-                Color.fitbitBackground
-                    .ignoresSafeArea()
-            }
-            .refreshable {
-                await viewModel.refresh()
-            }
-            .animation(statusAnimation, value: viewModel.errorMessage)
-            .toolbar(.hidden, for: .navigationBar)
-            .sheet(isPresented: $showingSettings) {
-                SettingsView(
-                    viewModel: viewModel,
-                    accountEmail: accountEmail,
-                    onSignOut: onSignOut
-                )
+                .padding(.horizontal, 20)
+                .padding(.top, 26)
+                .padding(.bottom, 38)
             }
         }
-        .preferredColorScheme(viewModel.preferences.units.appearance.preferredColorScheme)
+        .scrollIndicators(.hidden)
+        .background {
+            Color.fitbitBackground
+                .ignoresSafeArea()
+        }
+        .overlay(alignment: .bottom) {
+            ScrollBottomFade(color: .fitbitBackground)
+        }
+        .refreshable {
+            await store.refreshSummary()
+        }
+        .animation(statusAnimation, value: store.errorMessage)
+        .toolbar(.hidden, for: .navigationBar)
+        .sheet(isPresented: $showingSettings) {
+            SettingsView(
+                store: store,
+                accountEmail: accountEmail,
+                onSignOut: onSignOut
+            )
+        }
     }
 
     private var statusAnimation: Animation? {
@@ -66,8 +90,30 @@ struct SummaryView: View {
     }
 }
 
+private struct ScrollBottomFade: View {
+    let color: Color
+
+    var body: some View {
+        LinearGradient(
+            stops: [
+                Gradient.Stop(color: color.opacity(0), location: 0),
+                Gradient.Stop(color: color.opacity(0.85), location: 0.72),
+                Gradient.Stop(color: color, location: 1)
+            ],
+            startPoint: .top,
+            endPoint: .bottom
+        )
+        .frame(height: 52)
+        .frame(maxWidth: .infinity)
+        .ignoresSafeArea(edges: .bottom)
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+}
+
 private struct ActivityTopBand: View {
     let snapshot: DashboardSnapshot
+    let accountEmail: String?
     let onSettings: () -> Void
 
     var body: some View {
@@ -75,6 +121,8 @@ private struct ActivityTopBand: View {
             ActivityHeader(
                 syncState: snapshot.syncState,
                 lastUpdated: snapshot.lastUpdated,
+                accountEmail: accountEmail,
+                date: snapshot.date,
                 onSettings: onSettings
             )
 
@@ -96,19 +144,23 @@ private struct ActivityTopBand: View {
 private struct ActivityHeader: View {
     let syncState: SyncState
     let lastUpdated: Date
+    let accountEmail: String?
+    let date: Date
     let onSettings: () -> Void
 
     var body: some View {
         HStack(alignment: .top, spacing: 14) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Activity")
+            VStack(alignment: .leading, spacing: 5) {
+                Text("Summary")
                     .font(.system(size: 38, weight: .bold, design: .rounded))
                     .lineLimit(1)
                     .minimumScaleFactor(0.75)
 
-                Text("Today")
+                Text(headerSubtitle)
                     .font(.title3.weight(.bold))
                     .foregroundStyle(.secondary)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.78)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
 
@@ -131,6 +183,14 @@ private struct ActivityHeader: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var headerSubtitle: String {
+        let dateText = date.formatted(date: .abbreviated, time: .omitted)
+        guard let accountEmail, !accountEmail.isEmpty else {
+            return dateText
+        }
+        return "\(dateText) - \(accountEmail)"
     }
 }
 
@@ -374,7 +434,7 @@ private struct SyncStatusBanner: View {
 #if DEBUG
 #Preview("Dashboard") {
     SummaryView(
-        viewModel: .preview(snapshot: .previewPopulated),
+        store: .preview(snapshot: .previewPopulated),
         accountEmail: "osanyemosadebe@example.com",
         onSignOut: {}
     )
@@ -382,7 +442,7 @@ private struct SyncStatusBanner: View {
 
 #Preview("Refreshing") {
     SummaryView(
-        viewModel: .preview(snapshot: .previewRefreshing),
+        store: .preview(snapshot: .previewRefreshing),
         accountEmail: "osanyemosadebe@example.com",
         onSignOut: {}
     )
@@ -390,7 +450,7 @@ private struct SyncStatusBanner: View {
 
 #Preview("Failed") {
     SummaryView(
-        viewModel: .preview(
+        store: .preview(
             snapshot: .previewFailed,
             errorMessage: "Google Health did not return today's activity yet."
         ),
@@ -401,29 +461,29 @@ private struct SyncStatusBanner: View {
 
 #Preview("Empty") {
     SummaryView(
-        viewModel: .preview(snapshot: .previewEmpty),
+        store: .preview(snapshot: .previewEmpty),
         accountEmail: "osanyemosadebe@example.com",
         onSignOut: {}
     )
 }
 
 @MainActor
-private extension SummaryViewModel {
+private extension FitnessDashboardStore {
     static func preview(
         snapshot: DashboardSnapshot,
         preferences: DashboardPreferences = .defaults,
         errorMessage: String? = nil
-    ) -> SummaryViewModel {
+    ) -> FitnessDashboardStore {
         let cache = PreviewDashboardCache(snapshot: snapshot, preferences: preferences)
         let repository = DashboardRepository(
             googleHealthClient: PreviewGoogleHealthClient(snapshot: snapshot),
             cache: cache
         )
-        let viewModel = SummaryViewModel(repository: repository, cache: cache)
-        viewModel.snapshot = snapshot
-        viewModel.preferences = preferences
-        viewModel.errorMessage = errorMessage
-        return viewModel
+        let store = FitnessDashboardStore(repository: repository, cache: cache)
+        store.snapshot = FitnessDataSnapshot.fromLegacyDashboard(snapshot)
+        store.preferences = preferences
+        store.errorMessage = errorMessage
+        return store
     }
 }
 
@@ -440,7 +500,8 @@ private extension DashboardSnapshot {
                 steps: 8_942,
                 distanceMeters: 6_840,
                 activeCalories: 428,
-                totalCalories: 2_163
+                totalCalories: 2_163,
+                providedMetrics: [.steps, .distance, .activeEnergyBurned, .activeMinutes, .totalCalories]
             ),
             latestWorkout: WorkoutSummary(
                 type: "Outdoor Walk",

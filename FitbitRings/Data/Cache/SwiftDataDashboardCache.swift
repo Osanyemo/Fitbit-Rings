@@ -14,6 +14,14 @@ final class SwiftDataDashboardCache: DashboardCaching {
     }
 
     func loadDashboard() -> DashboardSnapshot? {
+        loadFitnessData()?.summary ?? loadLegacyDashboard()
+    }
+
+    func saveDashboard(_ snapshot: DashboardSnapshot) {
+        saveFitnessData(FitnessDataSnapshot.fromLegacyDashboard(snapshot))
+    }
+
+    func loadFitnessData() -> FitnessDataSnapshot? {
         let descriptor = FetchDescriptor<CachedDashboardSnapshot>(
             predicate: #Predicate { $0.id == "current" }
         )
@@ -22,15 +30,19 @@ final class SwiftDataDashboardCache: DashboardCaching {
             return nil
         }
 
-        return try? decoder.decode(DashboardSnapshot.CodableSnapshot.self, from: cached.data).domainValue
+        if let snapshot = try? decoder.decode(FitnessDataSnapshot.CodableSnapshot.self, from: cached.data).domainValue {
+            return snapshot
+        }
+
+        return loadLegacyDashboard(from: cached.data).map(FitnessDataSnapshot.fromLegacyDashboard)
     }
 
-    func saveDashboard(_ snapshot: DashboardSnapshot) {
+    func saveFitnessData(_ snapshot: FitnessDataSnapshot) {
         let descriptor = FetchDescriptor<CachedDashboardSnapshot>(
             predicate: #Predicate { $0.id == "current" }
         )
 
-        guard let data = try? encoder.encode(DashboardSnapshot.CodableSnapshot(snapshot)) else {
+        guard let data = try? encoder.encode(FitnessDataSnapshot.CodableSnapshot(snapshot)) else {
             return
         }
 
@@ -42,6 +54,17 @@ final class SwiftDataDashboardCache: DashboardCaching {
         }
 
         try? modelContext.save()
+    }
+
+    func clearHealthData() {
+        let descriptor = FetchDescriptor<CachedDashboardSnapshot>(
+            predicate: #Predicate { $0.id == "current" }
+        )
+
+        if let cached = try? modelContext.fetch(descriptor).first {
+            modelContext.delete(cached)
+            try? modelContext.save()
+        }
     }
 
     func loadPreferences() -> DashboardPreferences {
@@ -90,6 +113,22 @@ final class SwiftDataDashboardCache: DashboardCaching {
         }
 
         try? modelContext.save()
+    }
+
+    private func loadLegacyDashboard() -> DashboardSnapshot? {
+        let descriptor = FetchDescriptor<CachedDashboardSnapshot>(
+            predicate: #Predicate { $0.id == "current" }
+        )
+
+        guard let cached = try? modelContext.fetch(descriptor).first else {
+            return nil
+        }
+
+        return loadLegacyDashboard(from: cached.data)
+    }
+
+    private func loadLegacyDashboard(from data: Data) -> DashboardSnapshot? {
+        try? decoder.decode(DashboardSnapshot.CodableSnapshot.self, from: data).domainValue
     }
 }
 
@@ -168,12 +207,31 @@ extension DashboardSnapshot {
         var distanceMeters: Double
         var activeCalories: Double
         var totalCalories: Double
+        var providedMetrics: Set<GoogleHealthDataType>
 
         init(_ summary: ActivitySummary) {
             steps = summary.steps
             distanceMeters = summary.distanceMeters
             activeCalories = summary.activeCalories
             totalCalories = summary.totalCalories
+            providedMetrics = summary.providedMetrics
+        }
+
+        init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            steps = try container.decode(Int.self, forKey: .steps)
+            distanceMeters = try container.decode(Double.self, forKey: .distanceMeters)
+            activeCalories = try container.decode(Double.self, forKey: .activeCalories)
+            totalCalories = try container.decode(Double.self, forKey: .totalCalories)
+            providedMetrics = try container.decodeIfPresent(
+                Set<GoogleHealthDataType>.self,
+                forKey: .providedMetrics
+            ) ?? [
+                .steps,
+                .distance,
+                .activeEnergyBurned,
+                .totalCalories
+            ]
         }
 
         var domainValue: ActivitySummary {
@@ -181,7 +239,8 @@ extension DashboardSnapshot {
                 steps: steps,
                 distanceMeters: distanceMeters,
                 activeCalories: activeCalories,
-                totalCalories: totalCalories
+                totalCalories: totalCalories,
+                providedMetrics: providedMetrics
             )
         }
     }

@@ -121,6 +121,46 @@ final class GoogleHealthDecodingTests: XCTestCase {
         XCTAssertEqual(snapshot.activity.activeCalories, 325)
         XCTAssertEqual(snapshot.activity.distanceMeters, 4_500)
         XCTAssertEqual(snapshot.activity.totalCalories, 2_180)
+        XCTAssertTrue(snapshot.activity.hasData(for: .steps))
+        XCTAssertTrue(snapshot.activity.hasData(for: .distance))
+    }
+
+    func testMapperDistinguishesMissingValuesFromProvidedZero() throws {
+        let zeroSteps = GoogleHealthMapper.map(
+            goals: .defaultGoals,
+            date: Date(timeIntervalSince1970: 0),
+            rollups: [
+                .steps: GoogleHealthRollUpResponse(
+                    rollupDataPoints: [
+                        GoogleHealthRollupDataPoint(
+                            steps: GoogleHealthStepsRollup(countSum: GoogleHealthNumericValue(0)),
+                            activeMinutes: nil,
+                            activeEnergyBurned: nil,
+                            distance: nil,
+                            totalCalories: nil
+                        )
+                    ]
+                )
+            ],
+            latestWorkout: nil,
+            latestHeartRate: nil,
+            restingHeartRate: nil,
+            sleep: nil
+        )
+        let missingSteps = GoogleHealthMapper.map(
+            goals: .defaultGoals,
+            date: Date(timeIntervalSince1970: 0),
+            rollups: [:],
+            latestWorkout: nil,
+            latestHeartRate: nil,
+            restingHeartRate: nil,
+            sleep: nil
+        )
+
+        XCTAssertEqual(zeroSteps.activity.steps, 0)
+        XCTAssertTrue(zeroSteps.activity.hasData(for: .steps))
+        XCTAssertEqual(missingSteps.activity.steps, 0)
+        XCTAssertFalse(missingSteps.activity.hasData(for: .steps))
     }
 
     func testDataPointResponseDecodesWorkoutRecord() throws {
@@ -238,7 +278,7 @@ final class GoogleHealthDecodingTests: XCTestCase {
         XCTAssertTrue(body?.contains("\"day\":20") == true)
 
         let exerciseRequest = try XCTUnwrap(
-            requests.first { $0.url?.path == "/v4/users/me/dataTypes/exercise/dataPoints" }
+            requests.first { $0.url?.path == "/v4/users/me/dataTypes/exercise/dataPoints:reconcile" }
         )
         let queryItems = URLComponents(
             url: try XCTUnwrap(exerciseRequest.url),
@@ -249,6 +289,60 @@ final class GoogleHealthDecodingTests: XCTestCase {
         XCTAssertTrue(
             queryItems?.first(named: "filter")?.value?.contains("exercise.interval.civil_start_time") == true
         )
+    }
+
+    func testGoogleHealthClientBuildsActivityRollupAndReconcileRequests() async throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+
+        let httpClient = CapturingHTTPClient()
+        let client = GoogleHealthClient(networkClient: httpClient, calendar: calendar)
+        let date = calendar.date(from: DateComponents(year: 2026, month: 8, day: 20, hour: 12))!
+
+        _ = try await client.fetchActivityData(date: date)
+
+        let requests = httpClient.recordedRequests()
+        let hourlySteps = try XCTUnwrap(
+            requests.first { $0.url?.path == "/v4/users/me/dataTypes/steps/dataPoints:rollUp" }
+        )
+        let hourlyBody = String(data: try XCTUnwrap(hourlySteps.httpBody), encoding: .utf8)
+        XCTAssertTrue(hourlyBody?.contains("\"windowSize\":\"3600s\"") == true)
+
+        let activityLevel = try XCTUnwrap(
+            requests.first { $0.url?.path == "/v4/users/me/dataTypes/activity-level/dataPoints:reconcile" }
+        )
+        let queryItems = URLComponents(
+            url: try XCTUnwrap(activityLevel.url),
+            resolvingAgainstBaseURL: false
+        )?.queryItems
+        XCTAssertTrue(queryItems?.first(named: "filter")?.value?.contains("activity_level.date") == true)
+    }
+
+    func testReconcilePaginationIncludesPageTokenAndExerciseLimit() async throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+
+        let httpClient = PagingHTTPClient()
+        let client = GoogleHealthClient(networkClient: httpClient, calendar: calendar)
+        let date = calendar.date(from: DateComponents(year: 2026, month: 8, day: 20, hour: 12))!
+
+        _ = try await client.fetchWorkoutData(date: date)
+
+        let requests = httpClient.recordedRequests()
+        XCTAssertEqual(requests.count, 2)
+
+        let firstItems = URLComponents(
+            url: try XCTUnwrap(requests.first?.url),
+            resolvingAgainstBaseURL: false
+        )?.queryItems
+        XCTAssertEqual(firstItems?.first(named: "pageSize")?.value, "25")
+        XCTAssertNil(firstItems?.first(named: "pageToken"))
+
+        let secondItems = URLComponents(
+            url: try XCTUnwrap(requests.last?.url),
+            resolvingAgainstBaseURL: false
+        )?.queryItems
+        XCTAssertEqual(secondItems?.first(named: "pageToken")?.value, "next-page")
     }
 }
 
@@ -264,9 +358,33 @@ private final class CapturingHTTPClient: HTTPClient {
         let json: String
         if request.url?.path.contains("dataPoints:dailyRollUp") == true {
             json = #"{"rollupDataPoints":[]}"#
+        } else if request.url?.path.contains("dataPoints:rollUp") == true {
+            json = #"{"rollupDataPoints":[]}"#
         } else {
             json = #"{"dataPoints":[]}"#
         }
+        return try JSONDecoder.googleHealthDecoder.decode(T.self, from: Data(json.utf8))
+    }
+
+    func recordedRequests() -> [URLRequest] {
+        queue.sync { requests }
+    }
+}
+
+private final class PagingHTTPClient: HTTPClient {
+    private let queue = DispatchQueue(label: "PagingHTTPClient")
+    private var requests: [URLRequest] = []
+
+    func send<T: Decodable>(_ request: URLRequest, decoding type: T.Type) async throws -> T {
+        let requestNumber = queue.sync { () -> Int in
+            requests.append(request)
+            return requests.count
+        }
+
+        let json = requestNumber == 1
+            ? #"{"dataPoints":[{"dataPointName":"first"}],"nextPageToken":"next-page"}"#
+            : #"{"dataPoints":[{"dataPointName":"second"}]}"#
+
         return try JSONDecoder.googleHealthDecoder.decode(T.self, from: Data(json.utf8))
     }
 

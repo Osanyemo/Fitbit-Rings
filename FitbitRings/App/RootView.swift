@@ -7,21 +7,22 @@ import GoogleSignIn
 struct RootView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.scenePhase) private var scenePhase
-    @State private var viewModel: SummaryViewModel?
+    @State private var store: FitnessDashboardStore?
     @State private var isSignedIn = false
 
     private let authenticator = GoogleSignInAuthenticator()
 
     var body: some View {
         Group {
-            if let viewModel, isSignedIn {
-                SummaryView(
-                    viewModel: viewModel,
+            if let store, isSignedIn {
+                FitnessDashboardView(
+                    store: store,
                     accountEmail: authenticator.currentUserEmail,
                     onSignOut: {
+                        store.clearHealthDataForDisconnect()
                         authenticator.signOut()
                         isSignedIn = false
-                        self.viewModel = nil
+                        self.store = nil
                     }
                 )
             } else {
@@ -34,9 +35,9 @@ struct RootView: View {
             await restoreSessionAndLoad()
         }
         .onChange(of: scenePhase) { _, phase in
-            guard phase == .active, let viewModel, isSignedIn else { return }
+            guard phase == .active, let store, isSignedIn else { return }
             Task {
-                await viewModel.refreshIfStale()
+                await store.refreshSummaryIfStale()
             }
         }
         .onOpenURL { url in
@@ -49,12 +50,12 @@ struct RootView: View {
         isSignedIn = await authenticator.restorePreviousSignIn()
         guard isSignedIn else { return }
 
-        if viewModel == nil {
+        if store == nil {
             let cache = SwiftDataDashboardCache(modelContext: modelContext)
             let client = GoogleHealthClient(
                 networkClient: AuthenticatedHTTPClient(authProvider: authenticator)
             )
-            viewModel = SummaryViewModel(
+            store = FitnessDashboardStore(
                 repository: DashboardRepository(
                     googleHealthClient: client,
                     cache: cache
@@ -63,7 +64,7 @@ struct RootView: View {
             )
         }
 
-        await viewModel?.load()
+        await store?.load()
     }
 }
 

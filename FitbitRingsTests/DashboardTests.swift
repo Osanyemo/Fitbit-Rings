@@ -213,6 +213,55 @@ final class DashboardTests: XCTestCase {
         XCTAssertEqual(viewModel.snapshot, fresh)
     }
 
+    @MainActor
+    func testFitnessDashboardStoreLazyLoadsActivityOnce() async {
+        let summary = dashboardSnapshot(steps: 1_234, lastUpdated: Date(timeIntervalSince1970: 1_000))
+        let cache = InMemoryDashboardCache()
+        cache.fitnessSnapshot = FitnessDataSnapshot.fromLegacyDashboard(summary)
+        let client = SectionedGoogleHealthClient(summary: summary)
+        let repository = DashboardRepository(googleHealthClient: client, cache: cache)
+        let store = FitnessDashboardStore(repository: repository, cache: cache)
+
+        await store.loadIfNeeded(.activity)
+        await store.loadIfNeeded(.activity)
+
+        let count = await client.activityFetchCount
+        XCTAssertEqual(count, 1)
+        XCTAssertEqual(store.sectionState(.activity).phase, .loaded)
+        XCTAssertEqual(store.snapshot.activity.dailySeries.first?.type, .steps)
+    }
+
+    @MainActor
+    func testFitnessDashboardStoreRoutesSummaryCardsToOwningTabs() {
+        let summary = dashboardSnapshot(steps: 1_234, lastUpdated: Date(timeIntervalSince1970: 1_000))
+        let cache = InMemoryDashboardCache()
+        let client = StubGoogleHealthClient(response: .success(summary))
+        let repository = DashboardRepository(googleHealthClient: client, cache: cache)
+        let store = FitnessDashboardStore(repository: repository, cache: cache)
+
+        store.route(to: .metric(.heartRate))
+
+        XCTAssertEqual(store.selectedTab, .health)
+        XCTAssertEqual(store.healthPath.last, .metric(.heartRate))
+    }
+
+    @MainActor
+    func testFitnessDashboardStoreClearsCachedHealthDataOnDisconnect() {
+        let summary = dashboardSnapshot(steps: 1_234, lastUpdated: Date(timeIntervalSince1970: 1_000))
+        let cache = InMemoryDashboardCache()
+        cache.fitnessSnapshot = FitnessDataSnapshot.fromLegacyDashboard(summary)
+        let client = StubGoogleHealthClient(response: .success(summary))
+        let repository = DashboardRepository(googleHealthClient: client, cache: cache)
+        let store = FitnessDashboardStore(repository: repository, cache: cache)
+
+        store.clearHealthDataForDisconnect()
+
+        XCTAssertNil(cache.fitnessSnapshot)
+        XCTAssertNil(cache.snapshot)
+        XCTAssertEqual(cache.preferences, .defaults)
+        XCTAssertEqual(store.snapshot.summary.lastUpdated, .distantPast)
+    }
+
     func testCompactUpdateFormatting() {
         let now = Date(timeIntervalSince1970: 10_000)
 
@@ -356,17 +405,62 @@ private actor BlockingGoogleHealthClient: GoogleHealthServing {
     }
 }
 
+private actor SectionedGoogleHealthClient: GoogleHealthServing {
+    private let summary: DashboardSnapshot
+    private(set) var activityFetchCount = 0
+
+    init(summary: DashboardSnapshot) {
+        self.summary = summary
+    }
+
+    func fetchDashboard(goals: ActivityGoals, date: Date) async throws -> DashboardSnapshot {
+        summary
+    }
+
+    func fetchActivityData(date: Date) async throws -> ActivityDashboardData {
+        activityFetchCount += 1
+        let point = NumericMetricPoint(
+            id: "steps",
+            startDate: Date(timeIntervalSince1970: 1_000),
+            value: 1_234,
+            unit: "steps"
+        )
+        return ActivityDashboardData(
+            dailySeries: [NumericMetricSeries(type: .steps, points: [point])],
+            hourlySeries: [],
+            bucketedSeries: [],
+            loadedAt: Date(timeIntervalSince1970: 1_000)
+        )
+    }
+}
+
 @MainActor
 private final class InMemoryDashboardCache: DashboardCaching {
     var snapshot: DashboardSnapshot?
+    var fitnessSnapshot: FitnessDataSnapshot?
     var preferences: DashboardPreferences = .defaults
 
     func loadDashboard() -> DashboardSnapshot? {
-        snapshot
+        fitnessSnapshot?.summary ?? snapshot
     }
 
     func saveDashboard(_ snapshot: DashboardSnapshot) {
         self.snapshot = snapshot
+        fitnessSnapshot = FitnessDataSnapshot.fromLegacyDashboard(snapshot)
+    }
+
+    func loadFitnessData() -> FitnessDataSnapshot? {
+        fitnessSnapshot ?? snapshot.map(FitnessDataSnapshot.fromLegacyDashboard)
+    }
+
+    func saveFitnessData(_ snapshot: FitnessDataSnapshot) {
+        fitnessSnapshot = snapshot
+        self.snapshot = snapshot.summary
+    }
+
+    func clearHealthData() {
+        fitnessSnapshot = nil
+        snapshot = nil
     }
 
     func loadPreferences() -> DashboardPreferences {

@@ -2,7 +2,7 @@ import SwiftUI
 
 struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
-    @Bindable var viewModel: SummaryViewModel
+    @Bindable var store: FitnessDashboardStore
     let accountEmail: String?
     let onSignOut: () -> Void
 
@@ -12,15 +12,15 @@ struct SettingsView: View {
     @State private var distanceUnit: DistanceUnit
     @State private var appearance: AppearancePreference
 
-    init(viewModel: SummaryViewModel, accountEmail: String?, onSignOut: @escaping () -> Void) {
-        self.viewModel = viewModel
+    init(store: FitnessDashboardStore, accountEmail: String?, onSignOut: @escaping () -> Void) {
+        self.store = store
         self.accountEmail = accountEmail
         self.onSignOut = onSignOut
-        _moveGoal = State(initialValue: viewModel.preferences.goals.moveCalories)
-        _activeGoal = State(initialValue: viewModel.preferences.goals.activeMinutes)
-        _stepGoal = State(initialValue: viewModel.preferences.goals.steps)
-        _distanceUnit = State(initialValue: viewModel.preferences.units.distanceUnit)
-        _appearance = State(initialValue: viewModel.preferences.units.appearance)
+        _moveGoal = State(initialValue: store.preferences.goals.moveCalories)
+        _activeGoal = State(initialValue: store.preferences.goals.activeMinutes)
+        _stepGoal = State(initialValue: store.preferences.goals.steps)
+        _distanceUnit = State(initialValue: store.preferences.units.distanceUnit)
+        _appearance = State(initialValue: store.preferences.units.appearance)
     }
 
     var body: some View {
@@ -71,13 +71,13 @@ struct SettingsView: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") {
-                        viewModel.saveGoals(
+                        store.saveGoals(
                             moveCalories: moveGoal,
                             activeMinutes: activeGoal,
                             steps: stepGoal
                         )
-                        viewModel.saveUnits(distanceUnit)
-                        viewModel.saveAppearance(appearance)
+                        store.saveUnits(distanceUnit)
+                        store.saveAppearance(appearance)
                         dismiss()
                     }
                 }

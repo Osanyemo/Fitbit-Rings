@@ -15,7 +15,12 @@ struct DashboardRepository {
     }
 
     func cachedSnapshot() -> DashboardSnapshot? {
-        cache.loadDashboard()
+        cachedFitnessData()?.summary
+            ?? cache.loadDashboard()
+    }
+
+    func cachedFitnessData() -> FitnessDataSnapshot? {
+        cache.loadFitnessData()
     }
 
     func preferences() -> DashboardPreferences {
@@ -34,6 +39,99 @@ struct DashboardRepository {
         )
         cache.saveDashboard(snapshot)
         return snapshot
+    }
+
+    func refreshSummary(
+        preserving cachedSnapshot: FitnessDataSnapshot? = nil,
+        date: Date = .now
+    ) async throws -> FitnessDataSnapshot {
+        let preferences = cache.loadPreferences()
+        let summary = try await googleHealthClient.fetchDashboard(
+            goals: preferences.goals,
+            date: date
+        )
+
+        var snapshot = cachedSnapshot ?? cache.loadFitnessData() ?? .empty(goals: preferences.goals)
+        snapshot.summary = summary
+        if let latestWorkout = summary.latestWorkout,
+           !snapshot.workouts.contains(where: { $0.startTime == latestWorkout.startTime }) {
+            snapshot.workouts.insert(WorkoutDetail(summary: latestWorkout), at: 0)
+        }
+        if let sleep = summary.sleep,
+           !snapshot.health.sleepSessions.contains(where: { $0.startTime == sleep.startTime && $0.endTime == sleep.endTime }) {
+            snapshot.health.sleepSessions.insert(
+                SleepSession(
+                    id: sleep.startTime?.timeIntervalSince1970.description ?? "summary-sleep",
+                    startTime: sleep.startTime,
+                    endTime: sleep.endTime,
+                    durationSeconds: sleep.durationSeconds,
+                    stages: []
+                ),
+                at: 0
+            )
+        }
+        snapshot.lastUpdated = summary.lastUpdated
+        cache.saveFitnessData(snapshot)
+        return snapshot
+    }
+
+    func refreshActivity(
+        preserving cachedSnapshot: FitnessDataSnapshot,
+        date: Date = .now
+    ) async throws -> FitnessDataSnapshot {
+        var snapshot = cachedSnapshot
+        snapshot.activity = try await googleHealthClient.fetchActivityData(date: date)
+        snapshot.lastUpdated = .now
+        cache.saveFitnessData(snapshot)
+        return snapshot
+    }
+
+    func refreshWorkouts(
+        preserving cachedSnapshot: FitnessDataSnapshot,
+        date: Date = .now
+    ) async throws -> FitnessDataSnapshot {
+        var snapshot = cachedSnapshot
+        snapshot.workouts = try await googleHealthClient.fetchWorkoutData(date: date)
+        snapshot.lastUpdated = .now
+        cache.saveFitnessData(snapshot)
+        return snapshot
+    }
+
+    func refreshHealth(
+        preserving cachedSnapshot: FitnessDataSnapshot,
+        date: Date = .now
+    ) async throws -> FitnessDataSnapshot {
+        var snapshot = cachedSnapshot
+        snapshot.health = try await googleHealthClient.fetchHealthData(date: date)
+        snapshot.lastUpdated = .now
+        cache.saveFitnessData(snapshot)
+        return snapshot
+    }
+
+    func loadEarlierMetric(
+        _ type: GoogleHealthDataType,
+        preserving cachedSnapshot: FitnessDataSnapshot,
+        before: Date
+    ) async throws -> FitnessDataSnapshot {
+        let earlier = try await googleHealthClient.fetchEarlierMetricSeries(type, before: before)
+        var snapshot = cachedSnapshot
+
+        switch type.category {
+        case .activity:
+            snapshot.activity.mergeEarlier(earlier)
+        case .heart, .sleep, .vitals, .cardioFitness, .body:
+            snapshot.health.mergeEarlier(earlier)
+        case .workout:
+            break
+        }
+
+        snapshot.lastUpdated = .now
+        cache.saveFitnessData(snapshot)
+        return snapshot
+    }
+
+    func clearHealthData() {
+        cache.clearHealthData()
     }
 }
 

@@ -39,6 +39,9 @@
 		B00000000000000000000030 /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; productRef = P00000000000000000000001 /* GoogleSignIn */; };
 		B00000000000000000000031 /* GoogleSignInSwift in Frameworks */ = {isa = PBXBuildFile; productRef = P00000000000000000000002 /* GoogleSignInSwift */; };
 		B00000000000000000000032 /* FitbitRings/Resources/Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000034 /* FitbitRings/Resources/Assets.xcassets */; };
+		B00000000000000000000033 /* FitbitRings/Domain/FitnessDashboardModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000035 /* FitbitRings/Domain/FitnessDashboardModels.swift */; };
+		B00000000000000000000034 /* FitbitRings/Features/Dashboard/FitnessDashboardStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000036 /* FitbitRings/Features/Dashboard/FitnessDashboardStore.swift */; };
+		B00000000000000000000035 /* FitbitRings/Features/Dashboard/FitnessDashboardTabs.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000037 /* FitbitRings/Features/Dashboard/FitnessDashboardTabs.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -93,6 +96,9 @@
 		A00000000000000000000032 /* FitbitRingsTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = FitbitRingsTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		A00000000000000000000033 /* FitbitRingsUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = FitbitRingsUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		A00000000000000000000034 /* FitbitRings/Resources/Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = FitbitRings/Resources/Assets.xcassets; sourceTree = SOURCE_ROOT; };
+		A00000000000000000000035 /* FitbitRings/Domain/FitnessDashboardModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FitbitRings/Domain/FitnessDashboardModels.swift; sourceTree = SOURCE_ROOT; };
+		A00000000000000000000036 /* FitbitRings/Features/Dashboard/FitnessDashboardStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FitbitRings/Features/Dashboard/FitnessDashboardStore.swift; sourceTree = SOURCE_ROOT; };
+		A00000000000000000000037 /* FitbitRings/Features/Dashboard/FitnessDashboardTabs.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FitbitRings/Features/Dashboard/FitnessDashboardTabs.swift; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -144,6 +150,7 @@
 				A00000000000000000000007 /* FitbitRings/Core/Networking/GoogleHealthEndpoint.swift */,
 				A00000000000000000000008 /* FitbitRings/Core/Utilities/ViewControllerResolver.swift */,
 				A00000000000000000000009 /* FitbitRings/Domain/DashboardModels.swift */,
+				A00000000000000000000035 /* FitbitRings/Domain/FitnessDashboardModels.swift */,
 				A00000000000000000000010 /* FitbitRings/Domain/DashboardFormatting.swift */,
 				A00000000000000000000011 /* FitbitRings/Domain/DashboardRepository.swift */,
 				A00000000000000000000012 /* FitbitRings/Data/Cache/DashboardCache.swift */,
@@ -154,6 +161,8 @@
 				A00000000000000000000017 /* FitbitRings/Data/GoogleHealth/GoogleHealthMapper.swift */,
 				A00000000000000000000018 /* FitbitRings/Data/GoogleHealth/GoogleHealthClient.swift */,
 				A00000000000000000000019 /* FitbitRings/Features/Onboarding/OnboardingView.swift */,
+				A00000000000000000000036 /* FitbitRings/Features/Dashboard/FitnessDashboardStore.swift */,
+				A00000000000000000000037 /* FitbitRings/Features/Dashboard/FitnessDashboardTabs.swift */,
 				A00000000000000000000020 /* FitbitRings/Features/Summary/SummaryViewModel.swift */,
 				A00000000000000000000021 /* FitbitRings/Features/Summary/SummaryView.swift */,
 				A00000000000000000000022 /* FitbitRings/Features/Summary/ActivityRingsView.swift */,
@@ -339,6 +348,7 @@
 				B00000000000000000000007 /* FitbitRings/Core/Networking/GoogleHealthEndpoint.swift in Sources */,
 				B00000000000000000000008 /* FitbitRings/Core/Utilities/ViewControllerResolver.swift in Sources */,
 				B00000000000000000000009 /* FitbitRings/Domain/DashboardModels.swift in Sources */,
+				B00000000000000000000033 /* FitbitRings/Domain/FitnessDashboardModels.swift in Sources */,
 				B00000000000000000000010 /* FitbitRings/Domain/DashboardFormatting.swift in Sources */,
 				B00000000000000000000011 /* FitbitRings/Domain/DashboardRepository.swift in Sources */,
 				B00000000000000000000012 /* FitbitRings/Data/Cache/DashboardCache.swift in Sources */,
@@ -349,6 +359,8 @@
 				B00000000000000000000017 /* FitbitRings/Data/GoogleHealth/GoogleHealthMapper.swift in Sources */,
 				B00000000000000000000018 /* FitbitRings/Data/GoogleHealth/GoogleHealthClient.swift in Sources */,
 				B00000000000000000000019 /* FitbitRings/Features/Onboarding/OnboardingView.swift in Sources */,
+				B00000000000000000000034 /* FitbitRings/Features/Dashboard/FitnessDashboardStore.swift in Sources */,
+				B00000000000000000000035 /* FitbitRings/Features/Dashboard/FitnessDashboardTabs.swift in Sources */,
 				B00000000000000000000020 /* FitbitRings/Features/Summary/SummaryViewModel.swift in Sources */,
 				B00000000000000000000021 /* FitbitRings/Features/Summary/SummaryView.swift in Sources */,
 				B00000000000000000000022 /* FitbitRings/Features/Summary/ActivityRingsView.swift in Sources */,
