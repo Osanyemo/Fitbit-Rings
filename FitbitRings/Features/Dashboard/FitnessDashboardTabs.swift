@@ -88,6 +88,7 @@ struct SummaryHourlyPairSection: View {
                 systemImage: GoogleHealthDataType.steps.symbolName,
                 accentColor: .stepsRing,
                 points: hourlySeries(for: .steps)?.points ?? [],
+                reservesChartSpace: true,
                 isAvailable: snapshot.summary.activity.hasData(for: .steps)
             ) {
                 onSelectMetric(.steps)
@@ -101,6 +102,7 @@ struct SummaryHourlyPairSection: View {
                 systemImage: GoogleHealthDataType.distance.symbolName,
                 accentColor: .distanceAccent,
                 points: hourlySeries(for: .distance)?.points ?? [],
+                reservesChartSpace: true,
                 isAvailable: snapshot.summary.activity.hasData(for: .distance)
             ) {
                 onSelectMetric(.distance)
@@ -454,8 +456,11 @@ private struct DashboardScrollView<Content: View>: View {
         }
         .scrollIndicators(.hidden)
         .background(Color.fitbitBackground.ignoresSafeArea())
+        .overlay(alignment: .top) {
+            DashboardScrollEdgeFade(color: .fitbitBackground, edge: .top)
+        }
         .overlay(alignment: .bottom) {
-            DashboardBottomFade(color: .fitbitBackground)
+            DashboardScrollEdgeFade(color: .fitbitBackground, edge: .bottom)
         }
         .refreshable {
             await refresh()
@@ -562,16 +567,16 @@ private struct ActivityTodayFocusSection: View {
             return "Waiting for Activity"
         }
 
-        return allAvailableGoalsClosed ? "Goals Closed" : "Next Goal"
+        return allAvailableGoalsComplete ? "Goals Complete" : "Next Goal"
     }
 
     private var primarySubtitle: String {
-        allAvailableGoalsClosed
+        allAvailableGoalsComplete
             ? "Move, exercise, and steps are complete"
             : primaryInsight.primarySubtitle
     }
 
-    private var allAvailableGoalsClosed: Bool {
+    private var allAvailableGoalsComplete: Bool {
         let availableGoals = goalInsights.filter(\.isAvailable)
         return !availableGoals.isEmpty && availableGoals.allSatisfy(\.isComplete)
     }
@@ -590,8 +595,8 @@ private struct ActivityTodayFocusSection: View {
             return "No data"
         }
 
-        let closedCount = availableGoals.filter(\.isComplete).count
-        return "\(closedCount)/\(availableGoals.count) closed"
+        let completeCount = availableGoals.filter(\.isComplete).count
+        return "\(completeCount)/\(availableGoals.count) complete"
     }
 
     private var goalInsights: [ActivityGoalInsight] {
@@ -675,9 +680,9 @@ private struct ActivityGoalInsight: Identifiable {
             subtitle = "Not available today"
             primarySubtitle = "\(title) has not synced yet"
         } else if isComplete {
-            value = "Closed"
+            value = "Complete"
             unit = ""
-            primaryValue = "Closed"
+            primaryValue = "Complete"
             primaryUnit = ""
             subtitle = "\(logged) of \(goal) \(displayUnit)"
             primarySubtitle = "\(title) is \(progressText) complete"
@@ -792,6 +797,7 @@ struct DashboardMetricCard: View {
     let systemImage: String
     let accentColor: Color
     var points: [NumericMetricPoint] = []
+    var reservesChartSpace = false
     var isAvailable = true
     var onSelect: (() -> Void)?
 
@@ -864,15 +870,23 @@ struct DashboardMetricCard: View {
             if !points.isEmpty {
                 MetricBarChart(points: points, color: accentColor)
                     .frame(height: 44)
+            } else if reservesChartSpace {
+                Color.clear
+                    .frame(height: 44)
+                    .accessibilityHidden(true)
             }
         }
         .padding(16)
-        .frame(maxWidth: .infinity, minHeight: points.isEmpty ? 134 : 184, alignment: .topLeading)
+        .frame(maxWidth: .infinity, minHeight: showsChartSlot ? 184 : 134, alignment: .topLeading)
         .background(.summarySurface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: 8, style: .continuous)
                 .stroke(.dashboardStroke, lineWidth: 1)
         }
+    }
+
+    private var showsChartSlot: Bool {
+        !points.isEmpty || reservesChartSpace
     }
 }
 
@@ -909,6 +923,7 @@ private struct DashboardSeriesSection: View {
                             systemImage: item.type.symbolName,
                             accentColor: item.type.accentColor,
                             points: item.points,
+                            reservesChartSpace: true,
                             isAvailable: latest != nil
                         ) {
                             onSelectMetric(item.type)
@@ -961,7 +976,7 @@ private struct BucketList: View {
         VStack(alignment: .leading, spacing: 12) {
             Text(title)
                 .font(.headline.weight(.bold))
-            ForEach(buckets) { bucket in
+            ForEach(Array(buckets.enumerated()), id: \.offset) { _, bucket in
                 HStack {
                     Text(bucket.label)
                     Spacer()
@@ -1198,24 +1213,47 @@ private struct DashboardEmptyState: View {
     }
 }
 
-private struct DashboardBottomFade: View {
+private struct DashboardScrollEdgeFade: View {
+    enum Edge {
+        case top
+        case bottom
+    }
+
     let color: Color
+    let edge: Edge
 
     var body: some View {
         LinearGradient(
-            stops: [
-                Gradient.Stop(color: color.opacity(0), location: 0),
-                Gradient.Stop(color: color.opacity(0.85), location: 0.72),
-                Gradient.Stop(color: color, location: 1)
-            ],
+            stops: stops,
             startPoint: .top,
             endPoint: .bottom
         )
-        .frame(height: 52)
+        .frame(height: 56)
         .frame(maxWidth: .infinity)
-        .ignoresSafeArea(edges: .bottom)
+        .ignoresSafeArea(edges: ignoredSafeAreaEdges)
         .allowsHitTesting(false)
         .accessibilityHidden(true)
+    }
+
+    private var stops: [Gradient.Stop] {
+        switch edge {
+        case .top:
+            return [
+                Gradient.Stop(color: color, location: 0),
+                Gradient.Stop(color: color.opacity(0.85), location: 0.28),
+                Gradient.Stop(color: color.opacity(0), location: 1)
+            ]
+        case .bottom:
+            return [
+                Gradient.Stop(color: color.opacity(0), location: 0),
+                Gradient.Stop(color: color.opacity(0.85), location: 0.72),
+                Gradient.Stop(color: color, location: 1)
+            ]
+        }
+    }
+
+    private var ignoredSafeAreaEdges: SwiftUI.Edge.Set {
+        edge == .top ? .top : .bottom
     }
 }
 

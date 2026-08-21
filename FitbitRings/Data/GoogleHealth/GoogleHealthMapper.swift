@@ -364,7 +364,8 @@ enum GoogleHealthMapper {
     ) -> [BucketedMetricSeries] {
         var series: [BucketedMetricSeries] = []
 
-        let activeBuckets = (rollups[.activeMinutes]?.rollupDataPoints ?? [])
+        let activeBuckets = aggregateBuckets(
+            (rollups[.activeMinutes]?.rollupDataPoints ?? [])
             .compactMap(\.activeMinutes)
             .flatMap(\.activeMinutesRollupByActivityLevel)
             .compactMap { bucket -> MetricBucket? in
@@ -372,6 +373,7 @@ enum GoogleHealthMapper {
                       let value = bucket.activeMinutesSum?.doubleValue else { return nil }
                 return MetricBucket(label: label.displayNameFromEnum, value: value, unit: "min")
             }
+        )
         if !activeBuckets.isEmpty {
             series.append(
                 BucketedMetricSeries(
@@ -384,7 +386,8 @@ enum GoogleHealthMapper {
             )
         }
 
-        let zoneBuckets = (rollups[.timeInHeartRateZone]?.rollupDataPoints ?? [])
+        let zoneBuckets = aggregateBuckets(
+            (rollups[.timeInHeartRateZone]?.rollupDataPoints ?? [])
             .compactMap(\.timeInHeartRateZone)
             .compactMap { bucket -> MetricBucket? in
                 guard let label = bucket.heartRateZone,
@@ -392,6 +395,7 @@ enum GoogleHealthMapper {
                         ?? bucket.durationMillisSum.map({ $0.doubleValue / 60_000 }) else { return nil }
                 return MetricBucket(label: label.displayNameFromEnum, value: value, unit: "min")
             }
+        )
         if !zoneBuckets.isEmpty {
             series.append(
                 BucketedMetricSeries(
@@ -449,15 +453,34 @@ enum GoogleHealthMapper {
                     heartRateAverage: split.averageHeartRate?.doubleValue
                 )
             },
-            zoneMinutes: (exercise.zoneMinutes ?? []).compactMap { zone in
-                guard let label = zone.zone,
-                      let value = zone.minutes?.doubleValue
-                        ?? zone.durationMillis.map({ $0.doubleValue / 60_000 }) else {
-                    return nil
+            zoneMinutes: aggregateBuckets(
+                (exercise.zoneMinutes ?? []).compactMap { zone in
+                    guard let label = zone.zone,
+                          let value = zone.minutes?.doubleValue
+                            ?? zone.durationMillis.map({ $0.doubleValue / 60_000 }) else {
+                        return nil
+                    }
+                    return MetricBucket(label: label.displayNameFromEnum, value: value, unit: "min")
                 }
-                return MetricBucket(label: label.displayNameFromEnum, value: value, unit: "min")
-            }
+            )
         )
+    }
+
+    private static func aggregateBuckets(_ buckets: [MetricBucket]) -> [MetricBucket] {
+        var orderedLabels: [String] = []
+        var bucketsByLabel: [String: MetricBucket] = [:]
+
+        for bucket in buckets {
+            if var existing = bucketsByLabel[bucket.label] {
+                existing.value += bucket.value
+                bucketsByLabel[bucket.label] = existing
+            } else {
+                orderedLabels.append(bucket.label)
+                bucketsByLabel[bucket.label] = bucket
+            }
+        }
+
+        return orderedLabels.compactMap { bucketsByLabel[$0] }
     }
 
     private static func heartRate(from record: GoogleHealthDataPoint?) -> Int? {

@@ -68,8 +68,11 @@ struct SummaryView: View {
             Color.fitbitBackground
                 .ignoresSafeArea()
         }
+        .overlay(alignment: .top) {
+            SummaryScrollEdgeFade(color: .fitbitBackground, edge: .top)
+        }
         .overlay(alignment: .bottom) {
-            ScrollBottomFade(color: .fitbitBackground)
+            SummaryScrollEdgeFade(color: .fitbitBackground, edge: .bottom)
         }
         .refreshable {
             await store.refreshSummary()
@@ -90,24 +93,47 @@ struct SummaryView: View {
     }
 }
 
-private struct ScrollBottomFade: View {
+private struct SummaryScrollEdgeFade: View {
+    enum Edge {
+        case top
+        case bottom
+    }
+
     let color: Color
+    let edge: Edge
 
     var body: some View {
         LinearGradient(
-            stops: [
-                Gradient.Stop(color: color.opacity(0), location: 0),
-                Gradient.Stop(color: color.opacity(0.85), location: 0.72),
-                Gradient.Stop(color: color, location: 1)
-            ],
+            stops: stops,
             startPoint: .top,
             endPoint: .bottom
         )
-        .frame(height: 52)
+        .frame(height: 56)
         .frame(maxWidth: .infinity)
-        .ignoresSafeArea(edges: .bottom)
+        .ignoresSafeArea(edges: ignoredSafeAreaEdges)
         .allowsHitTesting(false)
         .accessibilityHidden(true)
+    }
+
+    private var stops: [Gradient.Stop] {
+        switch edge {
+        case .top:
+            return [
+                Gradient.Stop(color: color, location: 0),
+                Gradient.Stop(color: color.opacity(0.85), location: 0.28),
+                Gradient.Stop(color: color.opacity(0), location: 1)
+            ]
+        case .bottom:
+            return [
+                Gradient.Stop(color: color.opacity(0), location: 0),
+                Gradient.Stop(color: color.opacity(0.85), location: 0.72),
+                Gradient.Stop(color: color, location: 1)
+            ]
+        }
+    }
+
+    private var ignoredSafeAreaEdges: SwiftUI.Edge.Set {
+        edge == .top ? .top : .bottom
     }
 }
 

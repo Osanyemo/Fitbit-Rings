@@ -163,6 +163,53 @@ final class GoogleHealthDecodingTests: XCTestCase {
         XCTAssertFalse(missingSteps.activity.hasData(for: .steps))
     }
 
+    func testActivityMapperAggregatesDuplicateBucketLabels() throws {
+        let date = Date(timeIntervalSince1970: 0)
+        let activityData = GoogleHealthMapper.mapActivityData(
+            dailyRollups: [
+                .activeMinutes: GoogleHealthRollUpResponse(
+                    rollupDataPoints: [
+                        GoogleHealthRollupDataPoint(
+                            activeMinutes: GoogleHealthActiveMinutesRollup(
+                                activeMinutesRollupByActivityLevel: [
+                                    GoogleHealthActiveMinutesByActivityLevel(
+                                        activityLevel: "LIGHT",
+                                        activeMinutesSum: GoogleHealthNumericValue(10)
+                                    ),
+                                    GoogleHealthActiveMinutesByActivityLevel(
+                                        activityLevel: "MODERATE",
+                                        activeMinutesSum: GoogleHealthNumericValue(5)
+                                    )
+                                ]
+                            )
+                        ),
+                        GoogleHealthRollupDataPoint(
+                            activeMinutes: GoogleHealthActiveMinutesRollup(
+                                activeMinutesRollupByActivityLevel: [
+                                    GoogleHealthActiveMinutesByActivityLevel(
+                                        activityLevel: "LIGHT",
+                                        activeMinutesSum: GoogleHealthNumericValue(7)
+                                    ),
+                                    GoogleHealthActiveMinutesByActivityLevel(
+                                        activityLevel: "VIGOROUS",
+                                        activeMinutesSum: GoogleHealthNumericValue(3)
+                                    )
+                                ]
+                            )
+                        )
+                    ]
+                )
+            ],
+            hourlyRollups: [:],
+            range: DateInterval(start: date, duration: 14 * 86_400),
+            loadedAt: date
+        )
+
+        let activityLevel = try XCTUnwrap(activityData.bucketedSeries.first { $0.type == .activeMinutes })
+        XCTAssertEqual(activityLevel.buckets.map(\.label), ["Light", "Moderate", "Vigorous"])
+        XCTAssertEqual(activityLevel.buckets.map(\.value), [17, 5, 3])
+    }
+
     func testDataPointResponseDecodesWorkoutRecord() throws {
         let json = """
         {
