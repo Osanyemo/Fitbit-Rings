@@ -1,0 +1,586 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		B00000000000000000000001 /* FitbitRingsApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000001 /* FitbitRingsApp.swift */; };
+		B00000000000000000000002 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000002 /* RootView.swift */; };
+		B00000000000000000000003 /* AuthProviding.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000003 /* AuthProviding.swift */; };
+		B00000000000000000000004 /* GoogleSignInAuthenticator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000004 /* GoogleSignInAuthenticator.swift */; };
+		B00000000000000000000005 /* KeychainCredentialStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000005 /* KeychainCredentialStore.swift */; };
+		B00000000000000000000006 /* AuthenticatedHTTPClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000006 /* AuthenticatedHTTPClient.swift */; };
+		B00000000000000000000007 /* GoogleHealthEndpoint.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000007 /* GoogleHealthEndpoint.swift */; };
+		B00000000000000000000008 /* ViewControllerResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000008 /* ViewControllerResolver.swift */; };
+		B00000000000000000000009 /* DashboardModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000009 /* DashboardModels.swift */; };
+		B00000000000000000000010 /* DashboardFormatting.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000010 /* DashboardFormatting.swift */; };
+		B00000000000000000000011 /* DashboardRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000011 /* DashboardRepository.swift */; };
+		B00000000000000000000012 /* DashboardCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000012 /* DashboardCache.swift */; };
+		B00000000000000000000013 /* CachedModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000013 /* CachedModels.swift */; };
+		B00000000000000000000014 /* SwiftDataDashboardCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000014 /* SwiftDataDashboardCache.swift */; };
+		B00000000000000000000015 /* GoogleHealthDataTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000015 /* GoogleHealthDataTypes.swift */; };
+		B00000000000000000000016 /* GoogleHealthDTOs.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000016 /* GoogleHealthDTOs.swift */; };
+		B00000000000000000000017 /* GoogleHealthMapper.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000017 /* GoogleHealthMapper.swift */; };
+		B00000000000000000000018 /* GoogleHealthClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000018 /* GoogleHealthClient.swift */; };
+		B00000000000000000000019 /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000019 /* OnboardingView.swift */; };
+		B00000000000000000000020 /* SummaryViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000020 /* SummaryViewModel.swift */; };
+		B00000000000000000000021 /* SummaryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000021 /* SummaryView.swift */; };
+		B00000000000000000000022 /* ActivityRingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000022 /* ActivityRingsView.swift */; };
+		B00000000000000000000023 /* RingGoalProgress.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000023 /* RingGoalProgress.swift */; };
+		B00000000000000000000024 /* SummarySections.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000024 /* SummarySections.swift */; };
+		B00000000000000000000025 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000025 /* SettingsView.swift */; };
+		B00000000000000000000026 /* Colors.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000026 /* Colors.swift */; };
+		B00000000000000000000027 /* DashboardTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000027 /* DashboardTests.swift */; };
+		B00000000000000000000028 /* GoogleHealthDecodingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000028 /* GoogleHealthDecodingTests.swift */; };
+		B00000000000000000000029 /* FitbitRingsUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000029 /* FitbitRingsUITests.swift */; };
+		B00000000000000000000030 /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; productRef = P00000000000000000000001 /* GoogleSignIn */; };
+		B00000000000000000000031 /* GoogleSignInSwift in Frameworks */ = {isa = PBXBuildFile; productRef = P00000000000000000000002 /* GoogleSignInSwift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		C00000000000000000000001 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = E00000000000000000000001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = D00000000000000000000001;
+			remoteInfo = "Fitbit Rings";
+		};
+		C00000000000000000000002 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = E00000000000000000000001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = D00000000000000000000001;
+			remoteInfo = "Fitbit Rings";
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		A00000000000000000000001 /* FitbitRingsApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FitbitRings/App/FitbitRingsApp.swift; sourceTree = SOURCE_ROOT; };
+		A00000000000000000000002 /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FitbitRings/App/RootView.swift; sourceTree = SOURCE_ROOT; };
+		A00000000000000000000003 /* AuthProviding.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FitbitRings/Core/Authentication/AuthProviding.swift; sourceTree = SOURCE_ROOT; };
+		A00000000000000000000004 /* GoogleSignInAuthenticator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FitbitRings/Core/Authentication/GoogleSignInAuthenticator.swift; sourceTree = SOURCE_ROOT; };
+		A00000000000000000000005 /* KeychainCredentialStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FitbitRings/Core/Authentication/KeychainCredentialStore.swift; sourceTree = SOURCE_ROOT; };
+		A00000000000000000000006 /* AuthenticatedHTTPClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FitbitRings/Core/Networking/AuthenticatedHTTPClient.swift; sourceTree = SOURCE_ROOT; };
+		A00000000000000000000007 /* GoogleHealthEndpoint.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FitbitRings/Core/Networking/GoogleHealthEndpoint.swift; sourceTree = SOURCE_ROOT; };
+		A00000000000000000000008 /* ViewControllerResolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FitbitRings/Core/Utilities/ViewControllerResolver.swift; sourceTree = SOURCE_ROOT; };
+		A00000000000000000000009 /* DashboardModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FitbitRings/Domain/DashboardModels.swift; sourceTree = SOURCE_ROOT; };
+		A00000000000000000000010 /* DashboardFormatting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FitbitRings/Domain/DashboardFormatting.swift; sourceTree = SOURCE_ROOT; };
+		A00000000000000000000011 /* DashboardRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FitbitRings/Domain/DashboardRepository.swift; sourceTree = SOURCE_ROOT; };
+		A00000000000000000000012 /* DashboardCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FitbitRings/Data/Cache/DashboardCache.swift; sourceTree = SOURCE_ROOT; };
+		A00000000000000000000013 /* CachedModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FitbitRings/Data/Cache/CachedModels.swift; sourceTree = SOURCE_ROOT; };
+		A00000000000000000000014 /* SwiftDataDashboardCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FitbitRings/Data/Cache/SwiftDataDashboardCache.swift; sourceTree = SOURCE_ROOT; };
+		A00000000000000000000015 /* GoogleHealthDataTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FitbitRings/Data/GoogleHealth/GoogleHealthDataTypes.swift; sourceTree = SOURCE_ROOT; };
+		A00000000000000000000016 /* GoogleHealthDTOs.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FitbitRings/Data/GoogleHealth/GoogleHealthDTOs.swift; sourceTree = SOURCE_ROOT; };
+		A00000000000000000000017 /* GoogleHealthMapper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FitbitRings/Data/GoogleHealth/GoogleHealthMapper.swift; sourceTree = SOURCE_ROOT; };
+		A00000000000000000000018 /* GoogleHealthClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FitbitRings/Data/GoogleHealth/GoogleHealthClient.swift; sourceTree = SOURCE_ROOT; };
+		A00000000000000000000019 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FitbitRings/Features/Onboarding/OnboardingView.swift; sourceTree = SOURCE_ROOT; };
+		A00000000000000000000020 /* SummaryViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FitbitRings/Features/Summary/SummaryViewModel.swift; sourceTree = SOURCE_ROOT; };
+		A00000000000000000000021 /* SummaryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FitbitRings/Features/Summary/SummaryView.swift; sourceTree = SOURCE_ROOT; };
+		A00000000000000000000022 /* ActivityRingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FitbitRings/Features/Summary/ActivityRingsView.swift; sourceTree = SOURCE_ROOT; };
+		A00000000000000000000023 /* RingGoalProgress.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FitbitRings/Features/Summary/RingGoalProgress.swift; sourceTree = SOURCE_ROOT; };
+		A00000000000000000000024 /* SummarySections.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FitbitRings/Features/Summary/SummarySections.swift; sourceTree = SOURCE_ROOT; };
+		A00000000000000000000025 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FitbitRings/Features/Settings/SettingsView.swift; sourceTree = SOURCE_ROOT; };
+		A00000000000000000000026 /* Colors.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FitbitRings/Resources/Colors.swift; sourceTree = SOURCE_ROOT; };
+		A00000000000000000000027 /* DashboardTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FitbitRingsTests/DashboardTests.swift; sourceTree = SOURCE_ROOT; };
+		A00000000000000000000028 /* GoogleHealthDecodingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FitbitRingsTests/GoogleHealthDecodingTests.swift; sourceTree = SOURCE_ROOT; };
+		A00000000000000000000029 /* FitbitRingsUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FitbitRingsUITests/FitbitRingsUITests.swift; sourceTree = SOURCE_ROOT; };
+		A00000000000000000000030 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = FitbitRings/Resources/Info.plist; sourceTree = SOURCE_ROOT; };
+		A00000000000000000000031 /* Fitbit Rings.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Fitbit Rings.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		A00000000000000000000032 /* FitbitRingsTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = FitbitRingsTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		A00000000000000000000033 /* FitbitRingsUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = FitbitRingsUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		F00000000000000000000001 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				B00000000000000000000030 /* GoogleSignIn in Frameworks */,
+				B00000000000000000000031 /* GoogleSignInSwift in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		F00000000000000000000002 /* Frameworks */ = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+		F00000000000000000000003 /* Frameworks */ = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		G00000000000000000000001 = {
+			isa = PBXGroup;
+			children = (
+				G00000000000000000000002 /* FitbitRings */,
+				G00000000000000000000003 /* FitbitRingsTests */,
+				G00000000000000000000004 /* FitbitRingsUITests */,
+				G00000000000000000000005 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		G00000000000000000000002 /* FitbitRings */ = {
+			isa = PBXGroup;
+			children = (
+				A00000000000000000000001 /* FitbitRingsApp.swift */,
+				A00000000000000000000002 /* RootView.swift */,
+				A00000000000000000000003 /* AuthProviding.swift */,
+				A00000000000000000000004 /* GoogleSignInAuthenticator.swift */,
+				A00000000000000000000005 /* KeychainCredentialStore.swift */,
+				A00000000000000000000006 /* AuthenticatedHTTPClient.swift */,
+				A00000000000000000000007 /* GoogleHealthEndpoint.swift */,
+				A00000000000000000000008 /* ViewControllerResolver.swift */,
+				A00000000000000000000009 /* DashboardModels.swift */,
+				A00000000000000000000010 /* DashboardFormatting.swift */,
+				A00000000000000000000011 /* DashboardRepository.swift */,
+				A00000000000000000000012 /* DashboardCache.swift */,
+				A00000000000000000000013 /* CachedModels.swift */,
+				A00000000000000000000014 /* SwiftDataDashboardCache.swift */,
+				A00000000000000000000015 /* GoogleHealthDataTypes.swift */,
+				A00000000000000000000016 /* GoogleHealthDTOs.swift */,
+				A00000000000000000000017 /* GoogleHealthMapper.swift */,
+				A00000000000000000000018 /* GoogleHealthClient.swift */,
+				A00000000000000000000019 /* OnboardingView.swift */,
+				A00000000000000000000020 /* SummaryViewModel.swift */,
+				A00000000000000000000021 /* SummaryView.swift */,
+				A00000000000000000000022 /* ActivityRingsView.swift */,
+				A00000000000000000000023 /* RingGoalProgress.swift */,
+				A00000000000000000000024 /* SummarySections.swift */,
+				A00000000000000000000025 /* SettingsView.swift */,
+				A00000000000000000000026 /* Colors.swift */,
+				A00000000000000000000030 /* Info.plist */,
+			);
+			name = FitbitRings;
+			sourceTree = "<group>";
+		};
+		G00000000000000000000003 /* FitbitRingsTests */ = {
+			isa = PBXGroup;
+			children = (
+				A00000000000000000000027 /* DashboardTests.swift */,
+				A00000000000000000000028 /* GoogleHealthDecodingTests.swift */,
+			);
+			name = FitbitRingsTests;
+			sourceTree = "<group>";
+		};
+		G00000000000000000000004 /* FitbitRingsUITests */ = {
+			isa = PBXGroup;
+			children = (
+				A00000000000000000000029 /* FitbitRingsUITests.swift */,
+			);
+			name = FitbitRingsUITests;
+			sourceTree = "<group>";
+		};
+		G00000000000000000000005 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				A00000000000000000000031 /* Fitbit Rings.app */,
+				A00000000000000000000032 /* FitbitRingsTests.xctest */,
+				A00000000000000000000033 /* FitbitRingsUITests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		D00000000000000000000001 /* Fitbit Rings */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = H00000000000000000000002 /* Build configuration list for PBXNativeTarget "Fitbit Rings" */;
+			buildPhases = (
+				S00000000000000000000001 /* Sources */,
+				F00000000000000000000001 /* Frameworks */,
+				R00000000000000000000001 /* Resources */,
+			);
+			buildRules = ();
+			dependencies = ();
+			name = "Fitbit Rings";
+			packageProductDependencies = (
+				P00000000000000000000001 /* GoogleSignIn */,
+				P00000000000000000000002 /* GoogleSignInSwift */,
+			);
+			productName = "Fitbit Rings";
+			productReference = A00000000000000000000031 /* Fitbit Rings.app */;
+			productType = "com.apple.product-type.application";
+		};
+		D00000000000000000000002 /* FitbitRingsTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = H00000000000000000000003 /* Build configuration list for PBXNativeTarget "FitbitRingsTests" */;
+			buildPhases = (
+				S00000000000000000000002 /* Sources */,
+				F00000000000000000000002 /* Frameworks */,
+				R00000000000000000000002 /* Resources */,
+			);
+			buildRules = ();
+			dependencies = (
+				T00000000000000000000001 /* PBXTargetDependency */,
+			);
+			name = FitbitRingsTests;
+			productName = FitbitRingsTests;
+			productReference = A00000000000000000000032 /* FitbitRingsTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		D00000000000000000000003 /* FitbitRingsUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = H00000000000000000000004 /* Build configuration list for PBXNativeTarget "FitbitRingsUITests" */;
+			buildPhases = (
+				S00000000000000000000003 /* Sources */,
+				F00000000000000000000003 /* Frameworks */,
+				R00000000000000000000003 /* Resources */,
+			);
+			buildRules = ();
+			dependencies = (
+				T00000000000000000000002 /* PBXTargetDependency */,
+			);
+			name = FitbitRingsUITests;
+			productName = FitbitRingsUITests;
+			productReference = A00000000000000000000033 /* FitbitRingsUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		E00000000000000000000001 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1500;
+				LastUpgradeCheck = 1500;
+				TargetAttributes = {
+					D00000000000000000000001 = {CreatedOnToolsVersion = 15.0; };
+					D00000000000000000000002 = {CreatedOnToolsVersion = 15.0; TestTargetID = D00000000000000000000001; };
+					D00000000000000000000003 = {CreatedOnToolsVersion = 15.0; TestTargetID = D00000000000000000000001; };
+				};
+			};
+			buildConfigurationList = H00000000000000000000001 /* Build configuration list for PBXProject "FitbitRings" */;
+			compatibilityVersion = "Xcode 15.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (en, Base);
+			mainGroup = G00000000000000000000001;
+			packageReferences = (
+				X00000000000000000000001 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */,
+			);
+			productRefGroup = G00000000000000000000005 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				D00000000000000000000001 /* Fitbit Rings */,
+				D00000000000000000000002 /* FitbitRingsTests */,
+				D00000000000000000000003 /* FitbitRingsUITests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		R00000000000000000000001 /* Resources */ = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+		R00000000000000000000002 /* Resources */ = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+		R00000000000000000000003 /* Resources */ = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		S00000000000000000000001 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				B00000000000000000000001,
+				B00000000000000000000002,
+				B00000000000000000000003,
+				B00000000000000000000004,
+				B00000000000000000000005,
+				B00000000000000000000006,
+				B00000000000000000000007,
+				B00000000000000000000008,
+				B00000000000000000000009,
+				B00000000000000000000010,
+				B00000000000000000000011,
+				B00000000000000000000012,
+				B00000000000000000000013,
+				B00000000000000000000014,
+				B00000000000000000000015,
+				B00000000000000000000016,
+				B00000000000000000000017,
+				B00000000000000000000018,
+				B00000000000000000000019,
+				B00000000000000000000020,
+				B00000000000000000000021,
+				B00000000000000000000022,
+				B00000000000000000000023,
+				B00000000000000000000024,
+				B00000000000000000000025,
+				B00000000000000000000026,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		S00000000000000000000002 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				B00000000000000000000027,
+				B00000000000000000000028,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		S00000000000000000000003 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				B00000000000000000000029,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		T00000000000000000000001 /* PBXTargetDependency */ = {isa = PBXTargetDependency; target = D00000000000000000000001 /* Fitbit Rings */; targetProxy = C00000000000000000000001 /* PBXContainerItemProxy */; };
+		T00000000000000000000002 /* PBXTargetDependency */ = {isa = PBXTargetDependency; target = D00000000000000000000001 /* Fitbit Rings */; targetProxy = C00000000000000000000002 /* PBXContainerItemProxy */; };
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		I00000000000000000000001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = ("DEBUG=1", "$(inherited)");
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+			};
+			name = Debug;
+		};
+		I00000000000000000000002 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				SDKROOT = iphoneos;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		I00000000000000000000003 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = "";
+				GENERATE_INFOPLIST_FILE = NO;
+				GOOGLE_CLIENT_ID = REPLACE_WITH_GOOGLE_CLIENT_ID;
+				INFOPLIST_FILE = FitbitRings/Resources/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				CURRENT_PROJECT_VERSION = 1;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.osanyemosadebe.fitbitrings;
+				PRODUCT_MODULE_NAME = FitbitRings;
+				PRODUCT_NAME = "Fitbit Rings";
+				REVERSED_GOOGLE_CLIENT_ID = REPLACE_WITH_REVERSED_GOOGLE_CLIENT_ID;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.9;
+				TARGETED_DEVICE_FAMILY = "1";
+			};
+			name = Debug;
+		};
+		I00000000000000000000004 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = "";
+				GENERATE_INFOPLIST_FILE = NO;
+				GOOGLE_CLIENT_ID = REPLACE_WITH_GOOGLE_CLIENT_ID;
+				INFOPLIST_FILE = FitbitRings/Resources/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				CURRENT_PROJECT_VERSION = 1;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.osanyemosadebe.fitbitrings;
+				PRODUCT_MODULE_NAME = FitbitRings;
+				PRODUCT_NAME = "Fitbit Rings";
+				REVERSED_GOOGLE_CLIENT_ID = REPLACE_WITH_REVERSED_GOOGLE_CLIENT_ID;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.9;
+				TARGETED_DEVICE_FAMILY = "1";
+			};
+			name = Release;
+		};
+		I00000000000000000000005 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = "";
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.osanyemosadebe.fitbitrings.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_VERSION = 5.9;
+				TARGETED_DEVICE_FAMILY = "1";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Fitbit Rings.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Fitbit Rings";
+			};
+			name = Debug;
+		};
+		I00000000000000000000006 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = "";
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.osanyemosadebe.fitbitrings.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_VERSION = 5.9;
+				TARGETED_DEVICE_FAMILY = "1";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Fitbit Rings.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Fitbit Rings";
+			};
+			name = Release;
+		};
+		I00000000000000000000007 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = "";
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.osanyemosadebe.fitbitrings.uitests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_VERSION = 5.9;
+				TARGETED_DEVICE_FAMILY = "1";
+				TEST_TARGET_NAME = "Fitbit Rings";
+			};
+			name = Debug;
+		};
+		I00000000000000000000008 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = "";
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.osanyemosadebe.fitbitrings.uitests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_VERSION = 5.9;
+				TARGETED_DEVICE_FAMILY = "1";
+				TEST_TARGET_NAME = "Fitbit Rings";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		H00000000000000000000001 /* Build configuration list for PBXProject "FitbitRings" */ = {isa = XCConfigurationList; buildConfigurations = (I00000000000000000000001, I00000000000000000000002); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+		H00000000000000000000002 /* Build configuration list for PBXNativeTarget "Fitbit Rings" */ = {isa = XCConfigurationList; buildConfigurations = (I00000000000000000000003, I00000000000000000000004); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+		H00000000000000000000003 /* Build configuration list for PBXNativeTarget "FitbitRingsTests" */ = {isa = XCConfigurationList; buildConfigurations = (I00000000000000000000005, I00000000000000000000006); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+		H00000000000000000000004 /* Build configuration list for PBXNativeTarget "FitbitRingsUITests" */ = {isa = XCConfigurationList; buildConfigurations = (I00000000000000000000007, I00000000000000000000008); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+/* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		X00000000000000000000001 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/google/GoogleSignIn-iOS";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 7.1.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		P00000000000000000000001 /* GoogleSignIn */ = {isa = XCSwiftPackageProductDependency; package = X00000000000000000000001 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */; productName = GoogleSignIn; };
+		P00000000000000000000002 /* GoogleSignInSwift */ = {isa = XCSwiftPackageProductDependency; package = X00000000000000000000001 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */; productName = GoogleSignInSwift; };
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = E00000000000000000000001 /* Project object */;
+}
