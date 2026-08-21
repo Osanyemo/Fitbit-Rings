@@ -136,7 +136,7 @@ private struct ActivityHeroPanel: View {
         ViewThatFits(in: .horizontal) {
             HStack(alignment: .center, spacing: 14) {
                 ActivityRingStats(rings: rings)
-                    .frame(width: 104, alignment: .leading)
+                    .frame(width: 116, alignment: .leading)
 
                 Spacer(minLength: 0)
 
@@ -145,7 +145,7 @@ private struct ActivityHeroPanel: View {
                     showsCenterSummary: false,
                     showsRingBadges: true
                 )
-                .frame(width: 220)
+                .frame(width: 208)
             }
 
             VStack(alignment: .leading, spacing: 20) {
@@ -197,11 +197,12 @@ private struct ActivityRingStats: View {
                 .minimumScaleFactor(0.72)
 
             Text(DashboardFormatting.integer(metric.value))
-                .font(.system(size: 31, weight: .bold, design: .rounded))
+                .font(.system(size: 30, weight: .bold, design: .rounded))
                 .monospacedDigit()
                 .foregroundStyle(.primary)
                 .lineLimit(1)
-                .minimumScaleFactor(0.52)
+                .minimumScaleFactor(0.45)
+                .allowsTightening(true)
 
             Text(unit)
                 .font(.headline.weight(.semibold))

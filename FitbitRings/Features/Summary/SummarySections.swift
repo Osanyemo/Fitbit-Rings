@@ -12,7 +12,7 @@ struct TodayGoalsSection: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            DashboardSectionHeader(title: "Today's Goals") {
+            DashboardSectionHeader(title: "Summary") {
                 Button {
                     withAnimation(.snappy(duration: 0.28)) {
                         isExpanded.toggle()
@@ -22,7 +22,7 @@ struct TodayGoalsSection: View {
                         .font(.headline.weight(.semibold))
                 }
                 .buttonStyle(DashboardPillButtonStyle())
-                .accessibilityLabel(isExpanded ? "Collapse today's goals" : "Expand today's goals")
+                .accessibilityLabel(isExpanded ? "Collapse summary" : "Expand summary")
             }
 
             if isExpanded {
@@ -268,8 +268,9 @@ private struct FitnessGoalCard: View {
                 Spacer(minLength: 0)
 
                 MetricValueText(value: card.value, unit: card.unit)
+                    .layoutPriority(1)
             }
-            .frame(height: 46)
+            .frame(minHeight: 46, alignment: .top)
 
             VStack(alignment: .leading, spacing: 5) {
                 Text(card.title)
@@ -335,17 +336,20 @@ private struct MetricValueText: View {
                 .font(.system(size: 31, weight: .bold, design: .rounded))
                 .monospacedDigit()
                 .lineLimit(1)
-                .minimumScaleFactor(0.58)
+                .minimumScaleFactor(0.45)
+                .allowsTightening(true)
+                .layoutPriority(1)
 
             if !unit.isEmpty {
                 Text(unit)
                     .font(.headline.weight(.semibold))
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
-                    .minimumScaleFactor(0.7)
+                    .minimumScaleFactor(0.55)
+                    .allowsTightening(true)
             }
         }
-        .frame(maxWidth: 110, alignment: .trailing)
+        .frame(maxWidth: .infinity, alignment: .trailing)
     }
 }
 
