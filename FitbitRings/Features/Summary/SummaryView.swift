@@ -9,30 +9,38 @@ struct SummaryView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: 18) {
-                    dashboardHeader
-                    SyncStatusBanner(
-                        syncState: viewModel.snapshot.syncState,
-                        errorMessage: viewModel.errorMessage
+                VStack(alignment: .leading, spacing: 0) {
+                    ActivityTopBand(
+                        snapshot: viewModel.snapshot,
+                        onSettings: {
+                            showingSettings = true
+                        }
                     )
 
-                    dashboardHero
+                    VStack(alignment: .leading, spacing: 30) {
+                        SyncStatusBanner(
+                            syncState: viewModel.snapshot.syncState,
+                            errorMessage: viewModel.errorMessage
+                        )
 
-                    ActivitySummarySection(
-                        summary: viewModel.snapshot.activity,
-                        units: viewModel.preferences.units
-                    )
-                    LatestWorkoutCard(
-                        workout: viewModel.snapshot.latestWorkout,
-                        units: viewModel.preferences.units
-                    )
-                    HeartSummarySection(summary: viewModel.snapshot.heart)
-                    SleepSummarySection(summary: viewModel.snapshot.sleep)
+                        TodayGoalsSection(
+                            snapshot: viewModel.snapshot,
+                            units: viewModel.preferences.units
+                        )
+
+                        if let latestWorkout = viewModel.snapshot.latestWorkout {
+                            RecentWorkoutSection(
+                                workout: latestWorkout,
+                                units: viewModel.preferences.units
+                            )
+                        }
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.top, 26)
+                    .padding(.bottom, 38)
                 }
-                .padding(.horizontal, 20)
-                .padding(.top, 12)
-                .padding(.bottom, 32)
             }
+            .scrollIndicators(.hidden)
             .background {
                 Color.fitbitBackground
                     .ignoresSafeArea()
@@ -40,18 +48,7 @@ struct SummaryView: View {
             .refreshable {
                 await viewModel.refresh()
             }
-            .navigationTitle("Fitbit Rings")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        showingSettings = true
-                    } label: {
-                        Image(systemName: "gearshape")
-                    }
-                    .accessibilityLabel("Settings")
-                }
-            }
+            .toolbar(.hidden, for: .navigationBar)
             .sheet(isPresented: $showingSettings) {
                 SettingsView(
                     viewModel: viewModel,
@@ -62,38 +59,157 @@ struct SummaryView: View {
         }
         .preferredColorScheme(viewModel.preferences.units.appearance.preferredColorScheme)
     }
+}
 
-    private var dashboardHeader: some View {
-        HStack(alignment: .center, spacing: 16) {
+private struct ActivityTopBand: View {
+    let snapshot: DashboardSnapshot
+    let onSettings: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 26) {
+            ActivityHeader(
+                syncState: snapshot.syncState,
+                lastUpdated: snapshot.lastUpdated,
+                onSettings: onSettings
+            )
+
+            ActivityHeroPanel(rings: snapshot.rings)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 20)
+        .padding(.top, 54)
+        .padding(.bottom, 30)
+        .background(Color.activityHeaderSurface)
+        .overlay(alignment: .bottom) {
+            Rectangle()
+                .fill(.dashboardStroke)
+                .frame(height: 1)
+        }
+    }
+}
+
+private struct ActivityHeader: View {
+    let syncState: SyncState
+    let lastUpdated: Date
+    let onSettings: () -> Void
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 14) {
             VStack(alignment: .leading, spacing: 4) {
-                Text("Today")
-                    .font(.system(.largeTitle, design: .rounded, weight: .bold))
+                Text("Activity")
+                    .font(.system(size: 38, weight: .bold, design: .rounded))
                     .lineLimit(1)
                     .minimumScaleFactor(0.75)
 
-                Text(Date.now.formatted(date: .complete, time: .omitted))
-                    .font(.subheadline.weight(.semibold))
+                Text("Today")
+                    .font(.title3.weight(.bold))
                     .foregroundStyle(.secondary)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
 
-            SyncPill(syncState: viewModel.snapshot.syncState, lastUpdated: viewModel.snapshot.lastUpdated)
+            VStack(alignment: .trailing, spacing: 10) {
+                Button(action: onSettings) {
+                    Image(systemName: "gearshape.fill")
+                        .font(.system(size: 16, weight: .bold))
+                        .frame(width: 36, height: 36)
+                        .background(.dashboardTintSurface, in: Circle())
+                        .overlay {
+                            Circle()
+                                .stroke(.dashboardStroke, lineWidth: 1)
+                        }
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.primary)
+                .accessibilityLabel("Settings")
+
+                SyncPill(syncState: syncState, lastUpdated: lastUpdated)
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
+}
 
-    private var dashboardHero: some View {
-        VStack(spacing: 18) {
-            ActivityRingsView(rings: viewModel.snapshot.rings)
-            RingGoalProgress(rings: viewModel.snapshot.rings)
+private struct ActivityHeroPanel: View {
+    let rings: RingSet
+
+    var body: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(alignment: .center, spacing: 14) {
+                ActivityRingStats(rings: rings)
+                    .frame(width: 104, alignment: .leading)
+
+                Spacer(minLength: 0)
+
+                ActivityRingsView(
+                    rings: rings,
+                    showsCenterSummary: false,
+                    showsRingBadges: true
+                )
+                .frame(width: 220)
+            }
+
+            VStack(alignment: .leading, spacing: 20) {
+                ActivityRingsView(
+                    rings: rings,
+                    showsCenterSummary: false,
+                    showsRingBadges: true
+                )
+                .frame(maxWidth: 250)
+                .frame(maxWidth: .infinity)
+
+                ActivityRingStats(rings: rings)
+            }
         }
-        .padding(18)
-        .background(.summarySurface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .stroke(.dashboardStroke, lineWidth: 1)
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+private struct ActivityRingStats: View {
+    let rings: RingSet
+
+    var body: some View {
+        ViewThatFits(in: .horizontal) {
+            VStack(alignment: .leading, spacing: 22) {
+                heroMetric(title: "Move", metric: rings.move, unit: "kcal", color: .moveRing)
+                heroMetric(title: "Exercise", metric: rings.active, unit: "min", color: .activeRing)
+                heroMetric(title: "Steps", metric: rings.steps, unit: "steps", color: .stepsRing)
+            }
+
+            HStack(alignment: .top, spacing: 22) {
+                heroMetric(title: "Move", metric: rings.move, unit: "kcal", color: .moveRing)
+                heroMetric(title: "Exercise", metric: rings.active, unit: "min", color: .activeRing)
+                heroMetric(title: "Steps", metric: rings.steps, unit: "steps", color: .stepsRing)
+            }
         }
-        .shadow(color: Color.black.opacity(0.06), radius: 16, x: 0, y: 8)
+    }
+
+    private func heroMetric(
+        title: String,
+        metric: RingMetric,
+        unit: String,
+        color: Color
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(title)
+                .font(.title3.weight(.bold))
+                .foregroundStyle(color)
+                .lineLimit(1)
+                .minimumScaleFactor(0.72)
+
+            Text(DashboardFormatting.integer(metric.value))
+                .font(.system(size: 31, weight: .bold, design: .rounded))
+                .monospacedDigit()
+                .foregroundStyle(.primary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.52)
+
+            Text(unit)
+                .font(.headline.weight(.semibold))
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+        }
+        .accessibilityElement(children: .combine)
     }
 }
 

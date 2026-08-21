@@ -1,6 +1,11 @@
 import Foundation
 
 enum DashboardFormatting {
+    struct MetricValue: Equatable {
+        var value: String
+        var unit: String
+    }
+
     static let integer: NumberFormatter = {
         let formatter = NumberFormatter()
         formatter.numberStyle = .decimal
@@ -13,24 +18,34 @@ enum DashboardFormatting {
     }
 
     static func distance(_ meters: Double, unit: DistanceUnit) -> String {
+        let parts = distanceParts(meters, unit: unit)
+        return "\(parts.value) \(parts.unit)"
+    }
+
+    static func distanceParts(_ meters: Double, unit: DistanceUnit) -> MetricValue {
         switch unit {
         case .kilometers:
-            return String(format: "%.2f km", meters / 1_000)
+            return MetricValue(value: String(format: "%.2f", meters / 1_000), unit: "km")
         case .miles:
-            return String(format: "%.2f mi", meters / 1_609.344)
+            return MetricValue(value: String(format: "%.2f", meters / 1_609.344), unit: "mi")
         }
     }
 
     static func duration(_ seconds: TimeInterval) -> String {
+        let parts = durationParts(seconds)
+        return parts.unit.isEmpty ? parts.value : "\(parts.value)\(parts.unit)"
+    }
+
+    static func durationParts(_ seconds: TimeInterval) -> MetricValue {
         let totalMinutes = Int(seconds / 60)
         let hours = totalMinutes / 60
         let minutes = totalMinutes % 60
 
         if hours > 0 {
-            return "\(hours)h \(minutes)m"
+            return MetricValue(value: "\(hours)h \(minutes)m", unit: "")
         }
 
-        return "\(minutes)m"
+        return MetricValue(value: "\(minutes)", unit: "m")
     }
 
     static func percent(_ progress: Double) -> String {

@@ -15,6 +15,28 @@ final class DashboardTests: XCTestCase {
         XCTAssertEqual(DashboardFormatting.distance(1_609.344, unit: .miles), "1.00 mi")
     }
 
+    func testDistancePartsUseSelectedUnitForMetricCards() {
+        XCTAssertEqual(
+            DashboardFormatting.distanceParts(6_840, unit: .kilometers),
+            DashboardFormatting.MetricValue(value: "6.84", unit: "km")
+        )
+        XCTAssertEqual(
+            DashboardFormatting.distanceParts(1_609.344, unit: .miles),
+            DashboardFormatting.MetricValue(value: "1.00", unit: "mi")
+        )
+    }
+
+    func testDurationPartsUseCompactMetricCardUnits() {
+        XCTAssertEqual(
+            DashboardFormatting.durationParts(2_940),
+            DashboardFormatting.MetricValue(value: "49", unit: "m")
+        )
+        XCTAssertEqual(
+            DashboardFormatting.durationParts(3_900),
+            DashboardFormatting.MetricValue(value: "1h 5m", unit: "")
+        )
+    }
+
     func testPercentFormattingRoundsProgress() {
         XCTAssertEqual(DashboardFormatting.percent(0), "0%")
         XCTAssertEqual(DashboardFormatting.percent(0.865), "87%")
