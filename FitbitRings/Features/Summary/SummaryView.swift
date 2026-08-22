@@ -12,7 +12,6 @@ struct SummaryView: View {
             LazyVStack(alignment: .leading, spacing: 0) {
                 ActivityTopBand(
                     snapshot: store.snapshot.summary,
-                    accountEmail: accountEmail,
                     onSettings: {
                         showingSettings = true
                     }
@@ -141,7 +140,6 @@ private struct SummaryScrollEdgeFade: View {
 
 private struct ActivityTopBand: View {
     let snapshot: DashboardSnapshot
-    let accountEmail: String?
     let onSettings: () -> Void
 
     var body: some View {
@@ -149,7 +147,6 @@ private struct ActivityTopBand: View {
             ActivityHeader(
                 syncState: snapshot.syncState,
                 lastUpdated: snapshot.lastUpdated,
-                accountEmail: accountEmail,
                 date: snapshot.date,
                 onSettings: onSettings
             )
@@ -169,7 +166,6 @@ private struct ActivityTopBand: View {
 private struct ActivityHeader: View {
     let syncState: SyncState
     let lastUpdated: Date
-    let accountEmail: String?
     let date: Date
     let onSettings: () -> Void
 
@@ -224,11 +220,7 @@ private struct ActivityHeader: View {
     }
 
     private var headerSubtitle: String {
-        let dateText = date.formatted(date: .abbreviated, time: .omitted)
-        guard let accountEmail, !accountEmail.isEmpty else {
-            return dateText
-        }
-        return "\(dateText) - \(accountEmail)"
+        date.formatted(date: .abbreviated, time: .omitted)
     }
 }
 

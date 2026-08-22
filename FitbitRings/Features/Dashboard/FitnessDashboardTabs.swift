@@ -534,6 +534,7 @@ private struct MetricDetailView: View {
             title: type.displayName,
             subtitle: series?.rangeSubtitle ?? "Last 14 days",
             state: store.sectionState(type.category == .activity ? .activity : .health),
+            showsNavigationBackButton: true,
             onRefresh: {
                 await store.refreshSection(type.category == .activity ? .activity : .health)
             }
@@ -591,7 +592,11 @@ private struct WorkoutDetailView: View {
     let units: UnitPreferences
 
     var body: some View {
-        DashboardScrollView(title: workout.type, subtitle: workout.startTime.formatted(date: .abbreviated, time: .shortened)) {
+        DashboardScrollView(
+            title: workout.type,
+            subtitle: workout.startTime.formatted(date: .abbreviated, time: .shortened),
+            showsNavigationBackButton: true
+        ) {
             VStack(alignment: .leading, spacing: 22) {
                 WorkoutRowCard(workout: workout, units: units, onSelect: nil)
 
@@ -613,7 +618,11 @@ private struct SleepDetailView: View {
     let session: SleepSession
 
     var body: some View {
-        DashboardScrollView(title: "Sleep", subtitle: sleepRange) {
+        DashboardScrollView(
+            title: "Sleep",
+            subtitle: sleepRange,
+            showsNavigationBackButton: true
+        ) {
             VStack(alignment: .leading, spacing: 22) {
                 DashboardMetricCard(
                     title: "Duration",
@@ -659,6 +668,7 @@ private struct DashboardScrollView<Content: View>: View {
     let title: String
     var subtitle: String?
     var state: FitnessSectionState?
+    var showsNavigationBackButton: Bool
     let onRefresh: (() async -> Void)?
     @ViewBuilder var content: Content
 
@@ -666,12 +676,14 @@ private struct DashboardScrollView<Content: View>: View {
         title: String,
         subtitle: String? = nil,
         state: FitnessSectionState? = nil,
+        showsNavigationBackButton: Bool = false,
         onRefresh: (() async -> Void)? = nil,
         @ViewBuilder content: () -> Content
     ) {
         self.title = title
         self.subtitle = subtitle
         self.state = state
+        self.showsNavigationBackButton = showsNavigationBackButton
         self.onRefresh = onRefresh
         self.content = content()
     }
@@ -697,8 +709,9 @@ private struct DashboardScrollView<Content: View>: View {
         .refreshable {
             await refresh()
         }
+        .navigationTitle(showsNavigationBackButton ? title : "")
         .navigationBarTitleDisplayMode(.inline)
-        .toolbar(.hidden, for: .navigationBar)
+        .toolbar(showsNavigationBackButton ? .visible : .hidden, for: .navigationBar)
     }
 
     private func refresh() async {
