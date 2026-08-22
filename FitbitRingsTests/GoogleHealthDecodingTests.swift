@@ -87,6 +87,25 @@ final class GoogleHealthDecodingTests: XCTestCase {
         XCTAssertEqual(decoded.time?.nanos, 0)
     }
 
+    func testGoogleHealthCivilTimeDefaultsOmittedZeroValuedTimeFields() throws {
+        let json = """
+        {
+          "date": { "year": 2026, "month": 8, "day": 21 },
+          "time": {}
+        }
+        """.data(using: .utf8)!
+
+        let decoded = try JSONDecoder.googleHealthDecoder.decode(
+            GoogleHealthCivilDateTime.self,
+            from: json
+        )
+
+        XCTAssertEqual(decoded.time?.hours, 0)
+        XCTAssertEqual(decoded.time?.minutes, 0)
+        XCTAssertEqual(decoded.time?.seconds, 0)
+        XCTAssertEqual(decoded.time?.nanos, 0)
+    }
+
     func testMapperBuildsDashboardFromV4Rollups() throws {
         let snapshot = GoogleHealthMapper.map(
             goals: .defaultGoals,

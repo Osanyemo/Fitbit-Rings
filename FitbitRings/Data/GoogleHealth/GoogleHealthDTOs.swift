@@ -579,9 +579,9 @@ struct GoogleHealthTimeOfDay: Codable, Hashable, Sendable {
 
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        hours = try container.decode(Int.self, forKey: .hours)
-        minutes = try container.decode(Int.self, forKey: .minutes)
-        seconds = try container.decode(Int.self, forKey: .seconds)
+        hours = try container.decodeIfPresent(Int.self, forKey: .hours) ?? 0
+        minutes = try container.decodeIfPresent(Int.self, forKey: .minutes) ?? 0
+        seconds = try container.decodeIfPresent(Int.self, forKey: .seconds) ?? 0
         nanos = try container.decodeIfPresent(Int.self, forKey: .nanos) ?? 0
     }
 }
