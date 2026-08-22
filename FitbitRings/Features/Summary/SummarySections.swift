@@ -49,6 +49,19 @@ struct TodayGoalsSection: View {
         let summaryDayLabel = DashboardFormatting.compactDayLabel(for: snapshot.date)
         var cards: [FitnessGoalCardModel] = [
             FitnessGoalCardModel(
+                title: "Steps",
+                value: valueText(
+                    type: .steps,
+                    value: DashboardFormatting.integer(Double(snapshot.activity.steps))
+                ),
+                subtitle: summaryDayLabel,
+                progress: progressValue(type: .steps, progress: snapshot.rings.steps.progress),
+                systemImage: "shoeprints.fill",
+                accentColor: .stepsRing,
+                dataType: .steps,
+                isAvailable: snapshot.activity.hasData(for: .steps)
+            ),
+            FitnessGoalCardModel(
                 title: "Exercise Minutes",
                 value: valueText(
                     type: .activeMinutes,
@@ -64,42 +77,6 @@ struct TodayGoalsSection: View {
                 isAvailable: snapshot.activity.hasData(for: .activeMinutes)
             ),
             FitnessGoalCardModel(
-                title: "Calories",
-                value: valueText(
-                    type: .totalCalories,
-                    value: DashboardFormatting.integer(snapshot.activity.totalCalories)
-                ),
-                unit: unitText(type: .totalCalories, unit: "kcal"),
-                subtitle: summaryDayLabel,
-                systemImage: "fork.knife",
-                accentColor: .calorieAccent,
-                dataType: .totalCalories,
-                isAvailable: snapshot.activity.hasData(for: .totalCalories)
-            ),
-            FitnessGoalCardModel(
-                title: "Steps",
-                value: valueText(
-                    type: .steps,
-                    value: DashboardFormatting.integer(Double(snapshot.activity.steps))
-                ),
-                subtitle: summaryDayLabel,
-                progress: progressValue(type: .steps, progress: snapshot.rings.steps.progress),
-                systemImage: "shoeprints.fill",
-                accentColor: .stepsRing,
-                dataType: .steps,
-                isAvailable: snapshot.activity.hasData(for: .steps)
-            ),
-            FitnessGoalCardModel(
-                title: "Distance",
-                value: valueText(type: .distance, value: distance.value),
-                unit: unitText(type: .distance, unit: distance.unit),
-                subtitle: summaryDayLabel,
-                systemImage: "map.fill",
-                accentColor: .distanceAccent,
-                dataType: .distance,
-                isAvailable: snapshot.activity.hasData(for: .distance)
-            ),
-            FitnessGoalCardModel(
                 title: "Active Calories",
                 value: valueText(
                     type: .activeEnergyBurned,
@@ -113,6 +90,29 @@ struct TodayGoalsSection: View {
                 dataType: .activeEnergyBurned,
                 isHighlighted: snapshot.rings.move.progress >= 1,
                 isAvailable: snapshot.activity.hasData(for: .activeEnergyBurned)
+            ),
+            FitnessGoalCardModel(
+                title: "Distance",
+                value: valueText(type: .distance, value: distance.value),
+                unit: unitText(type: .distance, unit: distance.unit),
+                subtitle: summaryDayLabel,
+                systemImage: "map.fill",
+                accentColor: .distanceAccent,
+                dataType: .distance,
+                isAvailable: snapshot.activity.hasData(for: .distance)
+            ),
+            FitnessGoalCardModel(
+                title: "Calories",
+                value: valueText(
+                    type: .totalCalories,
+                    value: DashboardFormatting.integer(snapshot.activity.totalCalories)
+                ),
+                unit: unitText(type: .totalCalories, unit: "kcal"),
+                subtitle: summaryDayLabel,
+                systemImage: "fork.knife",
+                accentColor: .calorieAccent,
+                dataType: .totalCalories,
+                isAvailable: snapshot.activity.hasData(for: .totalCalories)
             )
         ]
 

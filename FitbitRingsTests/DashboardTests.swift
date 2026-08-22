@@ -51,6 +51,79 @@ final class DashboardTests: XCTestCase {
         XCTAssertEqual(AppearancePreference.dark.preferredColorScheme, ColorScheme.dark)
     }
 
+    func testActivityGoalPriorityKeepsStepsPrimaryWhenMoveIsFurtherBehind() throws {
+        let insights = [
+            activityGoalInsight(
+                title: "Steps",
+                value: 453,
+                goal: 10_000,
+                displayUnit: "steps",
+                dataType: .steps,
+                systemImage: "shoeprints.fill",
+                accentColor: .stepsRing
+            ),
+            activityGoalInsight(
+                title: "Exercise",
+                value: 5,
+                goal: 30,
+                displayUnit: "min",
+                dataType: .activeMinutes,
+                systemImage: "figure.run",
+                accentColor: .activeRing
+            ),
+            activityGoalInsight(
+                title: "Move",
+                value: 5,
+                goal: 500,
+                displayUnit: "kcal",
+                dataType: .activeEnergyBurned,
+                systemImage: "flame.fill",
+                accentColor: .moveRing
+            )
+        ]
+
+        let primary = try XCTUnwrap(ActivityGoalPriority.primaryInsight(from: insights))
+
+        XCTAssertEqual(primary.dataType, .steps)
+        XCTAssertEqual(primary.primaryUnit, "steps left")
+    }
+
+    func testActivityGoalPriorityFallsThroughAfterStepsAreComplete() throws {
+        let insights = [
+            activityGoalInsight(
+                title: "Steps",
+                value: 10_000,
+                goal: 10_000,
+                displayUnit: "steps",
+                dataType: .steps,
+                systemImage: "shoeprints.fill",
+                accentColor: .stepsRing
+            ),
+            activityGoalInsight(
+                title: "Exercise",
+                value: 5,
+                goal: 30,
+                displayUnit: "min",
+                dataType: .activeMinutes,
+                systemImage: "figure.run",
+                accentColor: .activeRing
+            ),
+            activityGoalInsight(
+                title: "Move",
+                value: 5,
+                goal: 500,
+                displayUnit: "kcal",
+                dataType: .activeEnergyBurned,
+                systemImage: "flame.fill",
+                accentColor: .moveRing
+            )
+        ]
+
+        let primary = try XCTUnwrap(ActivityGoalPriority.primaryInsight(from: insights))
+
+        XCTAssertEqual(primary.dataType, .activeMinutes)
+    }
+
     func testGoogleHealthMapperBuildsDashboardSnapshot() throws {
         let response = GoogleHealthRollUpResponse(
             rollupDataPoints: [
@@ -698,6 +771,27 @@ private func dashboardSnapshot(
         sleep: nil,
         lastUpdated: lastUpdated,
         syncState: syncState
+    )
+}
+
+private func activityGoalInsight(
+    title: String,
+    value: Double,
+    goal: Double,
+    displayUnit: String,
+    dataType: GoogleHealthDataType,
+    systemImage: String,
+    accentColor: Color,
+    isAvailable: Bool = true
+) -> ActivityGoalInsight {
+    ActivityGoalInsight(
+        title: title,
+        metric: RingMetric(title: title, value: value, goal: goal, unit: displayUnit),
+        displayUnit: displayUnit,
+        dataType: dataType,
+        systemImage: systemImage,
+        accentColor: accentColor,
+        isAvailable: isAvailable
     )
 }
 

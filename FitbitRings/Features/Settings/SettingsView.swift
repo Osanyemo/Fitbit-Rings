@@ -27,14 +27,14 @@ struct SettingsView: View {
         NavigationStack {
             Form {
                 Section("Goals") {
-                    Stepper(value: $moveGoal, in: 50...2_000, step: 25) {
-                        SettingsValueRow(title: "Move", value: "\(moveGoal) kcal")
+                    Stepper(value: $stepGoal, in: 1_000...50_000, step: 500) {
+                        SettingsValueRow(title: "Steps", value: DashboardFormatting.integer(Double(stepGoal)))
                     }
                     Stepper(value: $activeGoal, in: 5...240, step: 5) {
                         SettingsValueRow(title: "Active", value: "\(activeGoal) min")
                     }
-                    Stepper(value: $stepGoal, in: 1_000...50_000, step: 500) {
-                        SettingsValueRow(title: "Steps", value: DashboardFormatting.integer(Double(stepGoal)))
+                    Stepper(value: $moveGoal, in: 50...2_000, step: 25) {
+                        SettingsValueRow(title: "Move", value: "\(moveGoal) kcal")
                     }
                 }
 

@@ -828,7 +828,7 @@ private struct ActivityTodayFocusSection: View {
 
     private var primarySubtitle: String {
         allAvailableGoalsComplete
-            ? "Move, exercise, and steps are complete"
+            ? "Steps, exercise, and move are complete"
             : primaryInsight.primarySubtitle
     }
 
@@ -838,10 +838,7 @@ private struct ActivityTodayFocusSection: View {
     }
 
     private var primaryInsight: ActivityGoalInsight {
-        goalInsights
-            .filter { $0.isAvailable && !$0.isComplete }
-            .min { $0.progress < $1.progress }
-            ?? goalInsights.first { $0.isAvailable }
+        ActivityGoalPriority.primaryInsight(from: goalInsights)
             ?? goalInsights[0]
     }
 
@@ -862,13 +859,13 @@ private struct ActivityTodayFocusSection: View {
     private var goalInsights: [ActivityGoalInsight] {
         [
             ActivityGoalInsight(
-                title: "Move",
-                metric: snapshot.rings.move,
-                displayUnit: "kcal",
-                dataType: .activeEnergyBurned,
-                systemImage: "flame.fill",
-                accentColor: .moveRing,
-                isAvailable: snapshot.activity.hasData(for: .activeEnergyBurned)
+                title: "Steps",
+                metric: snapshot.rings.steps,
+                displayUnit: "steps",
+                dataType: .steps,
+                systemImage: "shoeprints.fill",
+                accentColor: .stepsRing,
+                isAvailable: snapshot.activity.hasData(for: .steps)
             ),
             ActivityGoalInsight(
                 title: "Exercise",
@@ -880,19 +877,19 @@ private struct ActivityTodayFocusSection: View {
                 isAvailable: snapshot.activity.hasData(for: .activeMinutes)
             ),
             ActivityGoalInsight(
-                title: "Steps",
-                metric: snapshot.rings.steps,
-                displayUnit: "steps",
-                dataType: .steps,
-                systemImage: "shoeprints.fill",
-                accentColor: .stepsRing,
-                isAvailable: snapshot.activity.hasData(for: .steps)
+                title: "Move",
+                metric: snapshot.rings.move,
+                displayUnit: "kcal",
+                dataType: .activeEnergyBurned,
+                systemImage: "flame.fill",
+                accentColor: .moveRing,
+                isAvailable: snapshot.activity.hasData(for: .activeEnergyBurned)
             )
         ]
     }
 }
 
-private struct ActivityGoalInsight: Identifiable {
+struct ActivityGoalInsight: Identifiable {
     var id: GoogleHealthDataType { dataType }
 
     let title: String
@@ -954,6 +951,14 @@ private struct ActivityGoalInsight: Identifiable {
             subtitle = "\(logged) of \(goal) \(displayUnit)"
             primarySubtitle = "\(title) is \(progressText) complete"
         }
+    }
+}
+
+enum ActivityGoalPriority {
+    static func primaryInsight(from insights: [ActivityGoalInsight]) -> ActivityGoalInsight? {
+        insights.first { $0.isAvailable && !$0.isComplete }
+            ?? insights.first { $0.isAvailable }
+            ?? insights.first
     }
 }
 
@@ -1724,6 +1729,16 @@ private struct WorkoutRowCard: View {
     private var stats: [WorkoutStat] {
         var stats: [WorkoutStat] = []
 
+        if let steps = workout.metricsSummary.steps {
+            stats.append(
+                WorkoutStat(
+                    id: "steps",
+                    text: DashboardFormatting.integer(Double(steps)),
+                    systemImage: "shoeprints.fill"
+                )
+            )
+        }
+
         if let distance = workout.metricsSummary.distanceMeters {
             stats.append(
                 WorkoutStat(
@@ -1740,16 +1755,6 @@ private struct WorkoutRowCard: View {
                     id: "calories",
                     text: "\(DashboardFormatting.integer(calories)) kcal",
                     systemImage: "flame"
-                )
-            )
-        }
-
-        if let steps = workout.metricsSummary.steps {
-            stats.append(
-                WorkoutStat(
-                    id: "steps",
-                    text: DashboardFormatting.integer(Double(steps)),
-                    systemImage: "shoeprints.fill"
                 )
             )
         }
@@ -2142,7 +2147,15 @@ private extension DashboardFormatting {
 
 private extension WorkoutDetail {
     func detailMetrics(units: UnitPreferences) -> [DetailMetric] {
-        var metrics: [DetailMetric] = [
+        var metrics: [DetailMetric] = []
+
+        if let steps = metricsSummary.steps {
+            metrics.append(
+                DetailMetric(title: "Steps", value: DashboardFormatting.integer(Double(steps)), unit: "", systemImage: "shoeprints.fill", color: .stepsRing)
+            )
+        }
+
+        metrics.append(
             DetailMetric(
                 title: "Duration",
                 value: DashboardFormatting.durationParts(durationSeconds).value,
@@ -2150,7 +2163,7 @@ private extension WorkoutDetail {
                 systemImage: "stopwatch",
                 color: .activeRing
             )
-        ]
+        )
 
         if let distanceMeters = metricsSummary.distanceMeters {
             let value = DashboardFormatting.distanceParts(distanceMeters, unit: units.distanceUnit)
@@ -2162,12 +2175,6 @@ private extension WorkoutDetail {
         if let calories = metricsSummary.caloriesKcal {
             metrics.append(
                 DetailMetric(title: "Calories", value: DashboardFormatting.integer(calories), unit: "kcal", systemImage: "flame", color: .moveRing)
-            )
-        }
-
-        if let steps = metricsSummary.steps {
-            metrics.append(
-                DetailMetric(title: "Steps", value: DashboardFormatting.integer(Double(steps)), unit: "", systemImage: "shoeprints.fill", color: .stepsRing)
             )
         }
 

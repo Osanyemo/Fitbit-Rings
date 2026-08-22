@@ -5,9 +5,9 @@ struct RingGoalProgress: View {
 
     var body: some View {
         VStack(spacing: 10) {
-            ProgressRow(metric: rings.move, color: .moveRing, systemImage: "flame.fill")
-            ProgressRow(metric: rings.active, color: .activeRing, systemImage: "bolt.heart.fill")
             ProgressRow(metric: rings.steps, color: .stepsRing, systemImage: "figure.walk")
+            ProgressRow(metric: rings.active, color: .activeRing, systemImage: "bolt.heart.fill")
+            ProgressRow(metric: rings.move, color: .moveRing, systemImage: "flame.fill")
         }
     }
 }

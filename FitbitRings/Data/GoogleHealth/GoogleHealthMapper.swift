@@ -937,11 +937,11 @@ private extension GoogleHealthDailyScalar {
 private extension GoogleHealthDataType {
     static var activitySeriesTypes: [GoogleHealthDataType] {
         [
-            .activeEnergyBurned,
-            .activeMinutes,
-            .activeZoneMinutes,
             .steps,
             .distance,
+            .activeMinutes,
+            .activeEnergyBurned,
+            .activeZoneMinutes,
             .floors,
             .altitude,
             .sedentaryPeriod,

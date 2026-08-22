@@ -427,11 +427,11 @@ private extension Date {
 
 private extension GoogleHealthClient {
     static let activityRollupTypes: [GoogleHealthDataType] = [
-        .activeEnergyBurned,
-        .activeMinutes,
-        .activeZoneMinutes,
         .steps,
         .distance,
+        .activeMinutes,
+        .activeEnergyBurned,
+        .activeZoneMinutes,
         .floors,
         .altitude,
         .swimLengthsData,

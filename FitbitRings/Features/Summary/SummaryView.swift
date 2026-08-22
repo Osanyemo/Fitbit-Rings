@@ -273,9 +273,9 @@ private struct ActivityRingStats: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            heroMetric(title: "Move", metric: rings.move, unit: "kcal", color: .moveRing)
-            heroMetric(title: "Exercise", metric: rings.active, unit: "min", color: .activeRing)
             heroMetric(title: "Steps", metric: rings.steps, unit: "steps", color: .stepsRing)
+            heroMetric(title: "Exercise", metric: rings.active, unit: "min", color: .activeRing)
+            heroMetric(title: "Move", metric: rings.move, unit: "kcal", color: .moveRing)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }

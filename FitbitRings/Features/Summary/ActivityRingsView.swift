@@ -13,9 +13,9 @@ struct ActivityRingsView: View {
             let ringSpacing = lineWidth * 1.55
 
             ZStack {
-                ring(metric: rings.move, color: .moveRing, inset: 0, lineWidth: lineWidth)
+                ring(metric: rings.steps, color: .stepsRing, inset: 0, lineWidth: lineWidth)
                 ring(metric: rings.active, color: .activeRing, inset: ringSpacing, lineWidth: lineWidth)
-                ring(metric: rings.steps, color: .stepsRing, inset: ringSpacing * 2, lineWidth: lineWidth)
+                ring(metric: rings.move, color: .moveRing, inset: ringSpacing * 2, lineWidth: lineWidth)
 
                 if showsCenterSummary {
                     centerSummary
@@ -34,7 +34,7 @@ struct ActivityRingsView: View {
         .padding(.horizontal, 2)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(
-            "Move \(Int(rings.move.value)) of \(Int(rings.move.goal)) calories, Exercise \(Int(rings.active.value)) of \(Int(rings.active.goal)) minutes, Steps \(Int(rings.steps.value)) of \(Int(rings.steps.goal))"
+            "Steps \(Int(rings.steps.value)) of \(Int(rings.steps.goal)), Exercise \(Int(rings.active.value)) of \(Int(rings.active.goal)) minutes, Move \(Int(rings.move.value)) of \(Int(rings.move.goal)) calories"
         )
     }
 
@@ -84,11 +84,11 @@ struct ActivityRingsView: View {
 
     private func ringBadges(size: CGFloat, lineWidth: CGFloat, ringSpacing: CGFloat) -> some View {
         ZStack {
-            ringBadge(systemImage: "arrow.right", color: .moveRing, lineWidth: lineWidth)
+            ringBadge(systemImage: "arrow.up", color: .stepsRing, lineWidth: lineWidth)
                 .position(x: size / 2, y: lineWidth / 2)
             ringBadge(systemImage: "chevron.right.2", color: .activeRing, lineWidth: lineWidth)
                 .position(x: size / 2, y: ringSpacing + lineWidth / 2)
-            ringBadge(systemImage: "arrow.up", color: .stepsRing, lineWidth: lineWidth)
+            ringBadge(systemImage: "arrow.right", color: .moveRing, lineWidth: lineWidth)
                 .position(x: size / 2, y: ringSpacing * 2 + lineWidth / 2)
         }
         .frame(width: size, height: size)

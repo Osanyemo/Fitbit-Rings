@@ -287,6 +287,50 @@ final class GoogleHealthDecodingTests: XCTestCase {
         XCTAssertEqual(activityLevel.buckets.map(\.value), [17, 16, 16])
     }
 
+    func testActivityMapperOrdersStepsBeforeOtherActivitySeries() throws {
+        let date = Date(timeIntervalSince1970: 0)
+        let activityData = GoogleHealthMapper.mapActivityData(
+            dailyRollups: [
+                .activeEnergyBurned: GoogleHealthRollUpResponse(
+                    rollupDataPoints: [
+                        GoogleHealthRollupDataPoint(
+                            startTime: date,
+                            activeEnergyBurned: GoogleHealthEnergyRollup(kcalSum: 325)
+                        )
+                    ]
+                ),
+                .activeMinutes: GoogleHealthRollUpResponse(
+                    rollupDataPoints: [
+                        GoogleHealthRollupDataPoint(
+                            startTime: date,
+                            activeMinutes: GoogleHealthActiveMinutesRollup(
+                                activeMinutesRollupByActivityLevel: [
+                                    GoogleHealthActiveMinutesByActivityLevel(
+                                        activityLevel: "LIGHT",
+                                        activeMinutesSum: GoogleHealthNumericValue(10)
+                                    )
+                                ]
+                            )
+                        )
+                    ]
+                ),
+                .steps: GoogleHealthRollUpResponse(
+                    rollupDataPoints: [
+                        GoogleHealthRollupDataPoint(
+                            startTime: date,
+                            steps: GoogleHealthStepsRollup(countSum: GoogleHealthNumericValue(7_842))
+                        )
+                    ]
+                )
+            ],
+            hourlyRollups: [:],
+            range: DateInterval(start: date, duration: 14 * 86_400),
+            loadedAt: date
+        )
+
+        XCTAssertEqual(activityData.dailySeries.map(\.type), [.steps, .activeMinutes, .activeEnergyBurned])
+    }
+
     func testActivityMapperHidesEmptyRollupsButKeepsExplicitZeroPoints() throws {
         let date = Date(timeIntervalSince1970: 0)
         let activityData = GoogleHealthMapper.mapActivityData(

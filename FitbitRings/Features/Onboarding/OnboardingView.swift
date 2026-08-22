@@ -35,7 +35,7 @@ struct OnboardingView: View {
                     )
                     OnboardingPoint(
                         icon: "circle.dashed.inset.filled",
-                        text: "Keeps the focus on today's Move, Active, and Steps progress."
+                        text: "Keeps the focus on today's Steps, Active, and Move progress."
                     )
                 }
                 .font(.callout)
