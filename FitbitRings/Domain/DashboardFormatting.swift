@@ -60,6 +60,57 @@ enum DashboardFormatting {
         return date.formatted(date: .omitted, time: .shortened)
     }
 
+    static func compactDayLabel(
+        for date: Date,
+        relativeTo now: Date = .now,
+        calendar: Calendar = .current
+    ) -> String {
+        if calendar.isDate(date, inSameDayAs: now) {
+            return "Today"
+        }
+
+        return compactMonthDay(date, calendar: calendar)
+    }
+
+    static func compactDateTimeLabel(
+        for date: Date,
+        relativeTo now: Date = .now,
+        calendar: Calendar = .current
+    ) -> String {
+        "\(compactDayLabel(for: date, relativeTo: now, calendar: calendar)) \(time(date))"
+    }
+
+    static func compactRangeLabel(
+        start: Date,
+        end: Date,
+        relativeTo now: Date = .now,
+        calendar: Calendar = .current
+    ) -> String {
+        if calendar.isDate(start, inSameDayAs: end) {
+            return compactDayLabel(for: start, relativeTo: now, calendar: calendar)
+        }
+
+        return "\(compactMonthDay(start, calendar: calendar))-\(compactMonthDay(end, calendar: calendar))"
+    }
+
+    static func compactRangeLabel(
+        start: Date?,
+        end: Date?,
+        relativeTo now: Date = .now,
+        calendar: Calendar = .current
+    ) -> String? {
+        switch (start, end) {
+        case let (start?, end?):
+            return compactRangeLabel(start: start, end: end, relativeTo: now, calendar: calendar)
+        case let (start?, nil):
+            return compactDayLabel(for: start, relativeTo: now, calendar: calendar)
+        case let (nil, end?):
+            return compactDayLabel(for: end, relativeTo: now, calendar: calendar)
+        case (nil, nil):
+            return nil
+        }
+    }
+
     static func relativeUpdate(_ date: Date) -> String {
         guard date > .distantPast else { return "Not synced yet" }
         let formatter = RelativeDateTimeFormatter()
@@ -94,5 +145,14 @@ enum DashboardFormatting {
         }
 
         return date.formatted(date: .abbreviated, time: .omitted)
+    }
+
+    private static func compactMonthDay(_ date: Date, calendar: Calendar) -> String {
+        let formatter = DateFormatter()
+        formatter.calendar = calendar
+        formatter.timeZone = calendar.timeZone
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "MMM d"
+        return formatter.string(from: date)
     }
 }

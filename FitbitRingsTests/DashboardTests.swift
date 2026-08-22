@@ -433,6 +433,40 @@ final class DashboardTests: XCTestCase {
         )
     }
 
+    func testCompactDayLabelUsesTodayForCurrentDay() throws {
+        let calendar = utcCalendar()
+        let now = try date(year: 2026, month: 8, day: 22, hour: 16, calendar: calendar)
+        let earlierToday = try date(year: 2026, month: 8, day: 22, hour: 6, calendar: calendar)
+
+        XCTAssertEqual(
+            DashboardFormatting.compactDayLabel(for: earlierToday, relativeTo: now, calendar: calendar),
+            "Today"
+        )
+    }
+
+    func testCompactDayLabelUsesMonthDayForPastDay() throws {
+        let calendar = utcCalendar()
+        let now = try date(year: 2026, month: 8, day: 22, calendar: calendar)
+        let pastDay = try date(year: 2026, month: 8, day: 8, calendar: calendar)
+
+        XCTAssertEqual(
+            DashboardFormatting.compactDayLabel(for: pastDay, relativeTo: now, calendar: calendar),
+            "Aug 8"
+        )
+    }
+
+    func testCompactRangeLabelUsesMonthDayRange() throws {
+        let calendar = utcCalendar()
+        let now = try date(year: 2026, month: 8, day: 22, calendar: calendar)
+        let start = try date(year: 2026, month: 8, day: 8, calendar: calendar)
+        let end = try date(year: 2026, month: 8, day: 22, calendar: calendar)
+
+        XCTAssertEqual(
+            DashboardFormatting.compactRangeLabel(start: start, end: end, relativeTo: now, calendar: calendar),
+            "Aug 8-Aug 22"
+        )
+    }
+
     func testMissingScopesErrorNamesScopes() {
         let error = AuthenticationError.missingScopes(["scope-a", "scope-b"])
 
@@ -645,6 +679,32 @@ private func dashboardSnapshot(
         lastUpdated: lastUpdated,
         syncState: syncState
     )
+}
+
+private func utcCalendar() -> Calendar {
+    var calendar = Calendar(identifier: .gregorian)
+    calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+    return calendar
+}
+
+private func date(
+    year: Int,
+    month: Int,
+    day: Int,
+    hour: Int = 0,
+    minute: Int = 0,
+    calendar: Calendar
+) throws -> Date {
+    let components = DateComponents(
+        calendar: calendar,
+        timeZone: calendar.timeZone,
+        year: year,
+        month: month,
+        day: day,
+        hour: hour,
+        minute: minute
+    )
+    return try XCTUnwrap(components.date)
 }
 
 private func waitForFetchCount(

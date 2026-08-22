@@ -35,7 +35,8 @@ struct TodayGoalsSection: View {
                         } label: {
                             FitnessGoalCard(card: card)
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(SummaryInteractiveCardButtonStyle())
+                        .accessibilityHint("Opens details")
                     }
                 }
                 .transition(.opacity.combined(with: .move(edge: .top)))
@@ -45,6 +46,7 @@ struct TodayGoalsSection: View {
 
     private var goalCards: [FitnessGoalCardModel] {
         let distance = DashboardFormatting.distanceParts(snapshot.activity.distanceMeters, unit: units.distanceUnit)
+        let summaryDayLabel = DashboardFormatting.compactDayLabel(for: snapshot.date)
         var cards: [FitnessGoalCardModel] = [
             FitnessGoalCardModel(
                 title: "Exercise Minutes",
@@ -53,7 +55,7 @@ struct TodayGoalsSection: View {
                     value: DashboardFormatting.integer(snapshot.rings.active.value)
                 ),
                 unit: unitText(type: .activeMinutes, unit: "m"),
-                percent: percentText(type: .activeMinutes, progress: snapshot.rings.active.progress),
+                subtitle: summaryDayLabel,
                 progress: progressValue(type: .activeMinutes, progress: snapshot.rings.active.progress),
                 systemImage: "figure.run",
                 accentColor: .activeRing,
@@ -68,6 +70,7 @@ struct TodayGoalsSection: View {
                     value: DashboardFormatting.integer(snapshot.activity.totalCalories)
                 ),
                 unit: unitText(type: .totalCalories, unit: "kcal"),
+                subtitle: summaryDayLabel,
                 systemImage: "fork.knife",
                 accentColor: .calorieAccent,
                 dataType: .totalCalories,
@@ -79,7 +82,7 @@ struct TodayGoalsSection: View {
                     type: .steps,
                     value: DashboardFormatting.integer(Double(snapshot.activity.steps))
                 ),
-                percent: percentText(type: .steps, progress: snapshot.rings.steps.progress),
+                subtitle: summaryDayLabel,
                 progress: progressValue(type: .steps, progress: snapshot.rings.steps.progress),
                 systemImage: "shoeprints.fill",
                 accentColor: .stepsRing,
@@ -90,6 +93,7 @@ struct TodayGoalsSection: View {
                 title: "Distance",
                 value: valueText(type: .distance, value: distance.value),
                 unit: unitText(type: .distance, unit: distance.unit),
+                subtitle: summaryDayLabel,
                 systemImage: "map.fill",
                 accentColor: .distanceAccent,
                 dataType: .distance,
@@ -102,7 +106,7 @@ struct TodayGoalsSection: View {
                     value: DashboardFormatting.integer(snapshot.activity.activeCalories)
                 ),
                 unit: unitText(type: .activeEnergyBurned, unit: "kcal"),
-                percent: percentText(type: .activeEnergyBurned, progress: snapshot.rings.move.progress),
+                subtitle: summaryDayLabel,
                 progress: progressValue(type: .activeEnergyBurned, progress: snapshot.rings.move.progress),
                 systemImage: "flame.fill",
                 accentColor: .moveRing,
@@ -117,7 +121,7 @@ struct TodayGoalsSection: View {
                 title: "Heart Rate",
                 value: snapshot.heart.mostRecentHeartRate.map(String.init) ?? "No data",
                 unit: snapshot.heart.mostRecentHeartRate == nil ? "" : "bpm",
-                subtitle: snapshot.heart.measuredAt.map { "Measured \(DashboardFormatting.time($0))" },
+                subtitle: snapshot.heart.measuredAt.map { "Measured \(DashboardFormatting.compactDateTimeLabel(for: $0))" },
                 systemImage: "heart.fill",
                 accentColor: .heartAccent,
                 dataType: .heartRate,
@@ -130,6 +134,7 @@ struct TodayGoalsSection: View {
                 title: "Resting Heart",
                 value: snapshot.heart.restingHeartRate.map(String.init) ?? "No data",
                 unit: snapshot.heart.restingHeartRate == nil ? "" : "bpm",
+                subtitle: summaryDayLabel,
                 systemImage: "heart.circle.fill",
                 accentColor: .heartAccent,
                 dataType: .dailyRestingHeartRate,
@@ -162,10 +167,6 @@ struct TodayGoalsSection: View {
         snapshot.activity.hasData(for: type) ? unit : ""
     }
 
-    private func percentText(type: GoogleHealthDataType, progress: Double) -> String? {
-        snapshot.activity.hasData(for: type) ? DashboardFormatting.percent(progress) : nil
-    }
-
     private func progressValue(type: GoogleHealthDataType, progress: Double) -> Double? {
         snapshot.activity.hasData(for: type) ? progress : nil
     }
@@ -175,7 +176,9 @@ struct TodayGoalsSection: View {
             return nil
         }
 
-        return "\(DashboardFormatting.time(sleep.startTime)) - \(DashboardFormatting.time(sleep.endTime))"
+        let dateLabel = DashboardFormatting.compactRangeLabel(start: sleep.startTime, end: sleep.endTime)
+        let timeRange = "\(DashboardFormatting.time(sleep.startTime))-\(DashboardFormatting.time(sleep.endTime))"
+        return [dateLabel, timeRange].compactMap { $0 }.joined(separator: " ")
     }
 
     private var sectionAnimation: Animation? {
@@ -205,17 +208,16 @@ struct RecentWorkoutSection: View {
                                 .lineLimit(1)
                                 .minimumScaleFactor(0.76)
 
-                            Text(workout.startTime.formatted(date: .abbreviated, time: .omitted))
+                            Text(DashboardFormatting.compactDayLabel(for: workout.startTime))
                                 .font(.headline.weight(.semibold))
                                 .foregroundStyle(.secondary)
                                 .lineLimit(1)
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
 
-                        Image(systemName: "chevron.right")
-                            .font(.headline.weight(.bold))
-                            .foregroundStyle(.tertiary)
-                            .frame(width: 24, height: 24)
+                        if onSelect != nil {
+                            SummaryActionIndicator(accentColor: .activeRing, size: 30)
+                        }
                     }
 
                     HStack(alignment: .top, spacing: 12) {
@@ -227,10 +229,15 @@ struct RecentWorkoutSection: View {
                 .padding(15)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(.summarySurface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .stroke(workoutBorder, lineWidth: 1)
+                }
                 .accessibilityElement(children: .combine)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(SummaryInteractiveCardButtonStyle())
             .disabled(onSelect == nil)
+            .accessibilityHint(onSelect == nil ? "" : "Opens workout details")
         }
     }
 
@@ -267,6 +274,10 @@ struct RecentWorkoutSection: View {
         }
 
         return metrics
+    }
+
+    private var workoutBorder: Color {
+        onSelect == nil ? Color.dashboardStroke : Color.activeRing.opacity(0.18)
     }
 }
 
@@ -307,7 +318,6 @@ private struct FitnessGoalCardModel: Identifiable {
     let value: String
     var unit = ""
     var subtitle: String?
-    var percent: String?
     var progress: Double?
     let systemImage: String
     let accentColor: Color
@@ -321,15 +331,16 @@ private struct FitnessGoalCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .top, spacing: 10) {
-                MetricBadge(systemImage: card.systemImage, accentColor: card.accentColor, size: 36)
+            HStack(alignment: .top, spacing: 8) {
+                MetricBadge(systemImage: card.systemImage, accentColor: card.accentColor, size: 34)
 
                 VStack(alignment: .leading, spacing: 3) {
                     Text(card.title)
                         .font(.subheadline.weight(.bold))
                         .foregroundStyle(.primary)
                         .lineLimit(2)
-                        .minimumScaleFactor(0.74)
+                        .minimumScaleFactor(0.70)
+                        .allowsTightening(true)
                         .fixedSize(horizontal: false, vertical: true)
 
                     if let subtitle = card.subtitle {
@@ -337,16 +348,17 @@ private struct FitnessGoalCard: View {
                             .font(.caption.weight(.semibold))
                             .foregroundStyle(.secondary)
                             .lineLimit(2)
-                            .minimumScaleFactor(0.78)
+                            .minimumScaleFactor(0.74)
+                            .allowsTightening(true)
                     }
                 }
                 .layoutPriority(1)
 
-                Spacer(minLength: 0)
-
-                if let percent = card.percent {
-                    GoalPercentBadge(percent: percent, color: card.accentColor)
-                }
+                Spacer(minLength: 28)
+            }
+            .frame(minHeight: 46, alignment: .topLeading)
+            .overlay(alignment: .topTrailing) {
+                SummaryActionIndicator(accentColor: card.accentColor, size: 28)
             }
 
             Spacer(minLength: 4)
@@ -359,8 +371,8 @@ private struct FitnessGoalCard: View {
                 }
             }
         }
-        .padding(14)
-        .frame(maxWidth: .infinity, minHeight: 144, alignment: .topLeading)
+        .padding(15)
+        .frame(maxWidth: .infinity, minHeight: 154, alignment: .topLeading)
         .background(cardBackground, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: 8, style: .continuous)
@@ -374,23 +386,7 @@ private struct FitnessGoalCard: View {
     }
 
     private var cardBorder: Color {
-        card.isHighlighted ? card.accentColor.opacity(0.20) : Color.dashboardStroke
-    }
-}
-
-private struct GoalPercentBadge: View {
-    let percent: String
-    let color: Color
-
-    var body: some View {
-        Text(percent)
-            .font(.caption.weight(.bold).monospacedDigit())
-            .foregroundStyle(color)
-            .lineLimit(1)
-            .minimumScaleFactor(0.8)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
-            .background(color.opacity(0.12), in: Capsule())
+        card.accentColor.opacity(card.isHighlighted ? 0.28 : 0.18)
     }
 }
 
@@ -532,6 +528,33 @@ private struct WorkoutMetricView: View {
 
     private var valueAnimation: Animation? {
         reduceMotion ? nil : .smooth(duration: 0.24, extraBounce: 0)
+    }
+}
+
+private struct SummaryActionIndicator: View {
+    let accentColor: Color
+    var size: CGFloat = 28
+
+    var body: some View {
+        Image(systemName: "chevron.right")
+            .font(.system(size: max(11, size * 0.42), weight: .bold))
+            .foregroundStyle(accentColor)
+            .frame(width: size, height: size)
+            .background(accentColor.opacity(0.13), in: Circle())
+            .overlay {
+                Circle()
+                    .stroke(accentColor.opacity(0.20), lineWidth: 1)
+            }
+            .accessibilityHidden(true)
+    }
+}
+
+private struct SummaryInteractiveCardButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.985 : 1)
+            .opacity(configuration.isPressed ? 0.86 : 1)
+            .animation(.smooth(duration: 0.16, extraBounce: 0), value: configuration.isPressed)
     }
 }
 

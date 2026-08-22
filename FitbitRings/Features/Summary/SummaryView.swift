@@ -189,7 +189,7 @@ private struct ActivityHeader: View {
                                 .stroke(.dashboardStroke, lineWidth: 1)
                         }
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(SummaryIconButtonStyle())
                 .foregroundStyle(.primary)
                 .accessibilityLabel("Settings")
             }
@@ -221,6 +221,15 @@ private struct ActivityHeader: View {
 
     private var headerSubtitle: String {
         date.formatted(date: .abbreviated, time: .omitted)
+    }
+}
+
+private struct SummaryIconButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.94 : 1)
+            .opacity(configuration.isPressed ? 0.82 : 1)
+            .animation(.smooth(duration: 0.14, extraBounce: 0), value: configuration.isPressed)
     }
 }
 

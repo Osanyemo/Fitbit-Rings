@@ -79,15 +79,20 @@ struct SummaryHourlyPairSection: View {
     ]
 
     var body: some View {
+        let stepsPoints = hourlySeries(for: .steps)?.points ?? []
+        let distancePoints = hourlySeries(for: .distance)?.points ?? []
+        let reservesChartSpace = stepsPoints.count > 1 || distancePoints.count > 1
+
         LazyVGrid(columns: columns, spacing: 12) {
             DashboardMetricCard(
                 title: "Steps",
                 value: stepsValue,
                 unit: stepsUnit,
-                subtitle: "Today",
+                subtitle: DashboardFormatting.compactDayLabel(for: snapshot.summary.date),
                 systemImage: GoogleHealthDataType.steps.symbolName,
                 accentColor: .stepsRing,
-                points: hourlySeries(for: .steps)?.points ?? [],
+                points: stepsPoints,
+                reservesChartSpace: reservesChartSpace,
                 isAvailable: snapshot.summary.activity.hasData(for: .steps)
             ) {
                 onSelectMetric(.steps)
@@ -97,10 +102,11 @@ struct SummaryHourlyPairSection: View {
                 title: "Distance",
                 value: distanceValue.value,
                 unit: distanceValue.unit,
-                subtitle: "Today",
+                subtitle: DashboardFormatting.compactDayLabel(for: snapshot.summary.date),
                 systemImage: GoogleHealthDataType.distance.symbolName,
                 accentColor: .distanceAccent,
-                points: hourlySeries(for: .distance)?.points ?? [],
+                points: distancePoints,
+                reservesChartSpace: reservesChartSpace,
                 isAvailable: snapshot.summary.activity.hasData(for: .distance)
             ) {
                 onSelectMetric(.distance)
@@ -313,7 +319,7 @@ private struct HealthOverviewSection: View {
                     } label: {
                         HealthOverviewCard(item: item)
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(DashboardInteractiveCardButtonStyle())
                 } else {
                     LazyVGrid(columns: columns, spacing: 12) {
                         ForEach(items) { item in
@@ -322,7 +328,7 @@ private struct HealthOverviewSection: View {
                             } label: {
                                 HealthOverviewCard(item: item)
                             }
-                            .buttonStyle(.plain)
+                            .buttonStyle(DashboardInteractiveCardButtonStyle())
                         }
                     }
                 }
@@ -354,7 +360,7 @@ private struct HealthOverviewSection: View {
             title: series.type.displayName,
             value: value.value,
             unit: value.unit,
-            subtitle: "Measured \(DashboardFormatting.time(latest.startDate))",
+            subtitle: "Measured \(DashboardFormatting.compactDateTimeLabel(for: latest.startDate))",
             systemImage: series.type.symbolName,
             accentColor: series.type.accentColor,
             destination: .metric(series.type)
@@ -388,7 +394,10 @@ private struct HealthOverviewSection: View {
         guard session.startTime != nil || session.endTime != nil else {
             return "Last sleep"
         }
-        return "\(DashboardFormatting.time(session.startTime)) - \(DashboardFormatting.time(session.endTime))"
+
+        let dateLabel = DashboardFormatting.compactRangeLabel(start: session.startTime, end: session.endTime)
+        let timeRange = "\(DashboardFormatting.time(session.startTime))-\(DashboardFormatting.time(session.endTime))"
+        return [dateLabel, timeRange].compactMap { $0 }.joined(separator: " ")
     }
 
     private func select(_ item: HealthOverviewItem) {
@@ -431,12 +440,12 @@ private struct HealthOverviewCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .top, spacing: 10) {
+            HStack(alignment: .top, spacing: 8) {
                 Image(systemName: item.systemImage)
                     .font(.headline.weight(.bold))
                     .symbolRenderingMode(.hierarchical)
                     .foregroundStyle(item.accentColor)
-                    .frame(width: 38, height: 38)
+                    .frame(width: 34, height: 34)
                     .background(item.accentColor.opacity(0.16), in: Circle())
 
                 VStack(alignment: .leading, spacing: 3) {
@@ -444,21 +453,24 @@ private struct HealthOverviewCard: View {
                         .font(.subheadline.weight(.bold))
                         .foregroundStyle(.primary)
                         .lineLimit(2)
-                        .minimumScaleFactor(0.72)
+                        .minimumScaleFactor(0.68)
+                        .allowsTightening(true)
+                        .fixedSize(horizontal: false, vertical: true)
 
                     Text(item.subtitle)
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(.secondary)
                         .lineLimit(2)
-                        .minimumScaleFactor(0.76)
+                        .minimumScaleFactor(0.72)
+                        .allowsTightening(true)
                 }
                 .layoutPriority(1)
 
-                Spacer(minLength: 0)
-
-                Image(systemName: "chevron.right")
-                    .font(.caption.weight(.bold))
-                    .foregroundStyle(.tertiary)
+                Spacer(minLength: 28)
+            }
+            .frame(minHeight: 48, alignment: .topLeading)
+            .overlay(alignment: .topTrailing) {
+                DashboardActionIndicator(accentColor: item.accentColor, size: 28)
             }
 
             Spacer(minLength: 0)
@@ -470,6 +482,7 @@ private struct HealthOverviewCard: View {
                     .lineLimit(1)
                     .minimumScaleFactor(0.48)
                     .allowsTightening(true)
+                    .layoutPriority(1)
 
                 if !item.unit.isEmpty {
                     Text(item.unit)
@@ -481,7 +494,7 @@ private struct HealthOverviewCard: View {
             }
         }
         .padding(15)
-        .frame(maxWidth: .infinity, minHeight: 136, alignment: .topLeading)
+        .frame(maxWidth: .infinity, minHeight: 148, alignment: .topLeading)
         .background(overviewBackground, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: 8, style: .continuous)
@@ -544,7 +557,7 @@ private struct MetricDetailView: View {
                     title: "Latest",
                     value: latestValue(for: series),
                     unit: latestUnit(for: series),
-                    subtitle: series?.latestPoint.map { "Recorded \($0.startDate.formatted(date: .abbreviated, time: .shortened))" },
+                    subtitle: series?.latestPoint.map { "Recorded \(DashboardFormatting.compactDateTimeLabel(for: $0.startDate))" },
                     systemImage: type.symbolName,
                     accentColor: type.accentColor,
                     points: series?.points ?? [],
@@ -594,7 +607,7 @@ private struct WorkoutDetailView: View {
     var body: some View {
         DashboardScrollView(
             title: workout.type,
-            subtitle: workout.startTime.formatted(date: .abbreviated, time: .shortened),
+            subtitle: DashboardFormatting.compactDateTimeLabel(for: workout.startTime),
             showsNavigationBackButton: true
         ) {
             VStack(alignment: .leading, spacing: 22) {
@@ -660,7 +673,9 @@ private struct SleepDetailView: View {
     }
 
     private var sleepRange: String {
-        "\(DashboardFormatting.time(session.startTime)) - \(DashboardFormatting.time(session.endTime))"
+        let dateLabel = DashboardFormatting.compactRangeLabel(start: session.startTime, end: session.endTime)
+        let timeRange = "\(DashboardFormatting.time(session.startTime))-\(DashboardFormatting.time(session.endTime))"
+        return [dateLabel, timeRange].compactMap { $0 }.joined(separator: " ")
     }
 }
 
@@ -801,7 +816,7 @@ private struct ActivityTodayFocusSection: View {
                     } label: {
                         ActivityGoalTile(insight: insight)
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(DashboardInteractiveCardButtonStyle())
                 }
             }
         }
@@ -961,6 +976,33 @@ private struct ActivityStatusPill: View {
     }
 }
 
+private struct DashboardActionIndicator: View {
+    let accentColor: Color
+    var size: CGFloat = 28
+
+    var body: some View {
+        Image(systemName: "chevron.right")
+            .font(.system(size: max(11, size * 0.42), weight: .bold))
+            .foregroundStyle(accentColor)
+            .frame(width: size, height: size)
+            .background(accentColor.opacity(0.13), in: Circle())
+            .overlay {
+                Circle()
+                    .stroke(accentColor.opacity(0.20), lineWidth: 1)
+            }
+            .accessibilityHidden(true)
+    }
+}
+
+private struct DashboardInteractiveCardButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.985 : 1)
+            .opacity(configuration.isPressed ? 0.86 : 1)
+            .animation(.smooth(duration: 0.16, extraBounce: 0), value: configuration.isPressed)
+    }
+}
+
 private struct ActivityGoalTile: View {
     let insight: ActivityGoalInsight
 
@@ -979,6 +1021,10 @@ private struct ActivityGoalTile: View {
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
                     .minimumScaleFactor(0.72)
+
+                Spacer(minLength: 0)
+
+                DashboardActionIndicator(accentColor: insight.accentColor, size: 24)
             }
 
             VStack(alignment: .leading, spacing: 6) {
@@ -1030,7 +1076,7 @@ private struct ActivityGoalTile: View {
     }
 
     private var tileBorder: Color {
-        insight.isComplete ? insight.accentColor.opacity(0.20) : Color.dashboardStroke
+        insight.accentColor.opacity(insight.isComplete ? 0.24 : 0.18)
     }
 }
 
@@ -1051,8 +1097,9 @@ struct DashboardMetricCard: View {
             Button(action: onSelect) {
                 cardContent
             }
-            .buttonStyle(.plain)
+            .buttonStyle(DashboardInteractiveCardButtonStyle())
             .accessibilityElement(children: .combine)
+            .accessibilityHint("Opens details")
         } else {
             cardContent
                 .accessibilityElement(children: .combine)
@@ -1061,12 +1108,12 @@ struct DashboardMetricCard: View {
 
     private var cardContent: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .top, spacing: 10) {
+            HStack(alignment: .top, spacing: 8) {
                 Image(systemName: systemImage)
                     .font(.headline.weight(.bold))
                     .symbolRenderingMode(.hierarchical)
                     .foregroundStyle(accentColor)
-                    .frame(width: 34, height: 34)
+                    .frame(width: 32, height: 32)
                     .background(accentColor.opacity(0.15), in: Circle())
 
                 VStack(alignment: .leading, spacing: 3) {
@@ -1074,23 +1121,27 @@ struct DashboardMetricCard: View {
                         .font(.subheadline.weight(.bold))
                         .foregroundStyle(.primary)
                         .lineLimit(2)
-                        .minimumScaleFactor(0.72)
+                        .minimumScaleFactor(0.68)
+                        .allowsTightening(true)
+                        .fixedSize(horizontal: false, vertical: true)
 
                     if let subtitle {
                         Text(subtitle)
                             .font(.caption.weight(.semibold))
                             .foregroundStyle(.secondary)
                             .lineLimit(2)
-                            .minimumScaleFactor(0.78)
+                            .minimumScaleFactor(0.72)
+                            .allowsTightening(true)
                     }
                 }
+                .layoutPriority(1)
 
-                Spacer(minLength: 0)
-
+                Spacer(minLength: onSelect == nil ? 0 : 28)
+            }
+            .frame(minHeight: 46, alignment: .topLeading)
+            .overlay(alignment: .topTrailing) {
                 if onSelect != nil {
-                    Image(systemName: "chevron.right")
-                        .font(.caption.weight(.bold))
-                        .foregroundStyle(.tertiary)
+                    DashboardActionIndicator(accentColor: accentColor, size: 28)
                 }
             }
 
@@ -1102,6 +1153,7 @@ struct DashboardMetricCard: View {
                     .lineLimit(1)
                     .minimumScaleFactor(0.46)
                     .allowsTightening(true)
+                    .layoutPriority(1)
 
                 if isAvailable && !unit.isEmpty {
                     Text(unit)
@@ -1114,28 +1166,32 @@ struct DashboardMetricCard: View {
 
             if showsChart {
                 MetricBarChart(points: points, color: accentColor)
-                    .frame(height: 38)
-            } else if reservesChartSpace && points.isEmpty {
+                    .frame(height: 42)
+            } else if reservesChartSpace {
                 Color.clear
-                    .frame(height: 38)
+                    .frame(height: 42)
                     .accessibilityHidden(true)
             }
         }
-        .padding(14)
-        .frame(maxWidth: .infinity, minHeight: showsChartSlot ? 168 : 122, alignment: .topLeading)
+        .padding(15)
+        .frame(maxWidth: .infinity, minHeight: showsChartSlot ? 176 : 130, alignment: .topLeading)
         .background(.summarySurface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .stroke(.dashboardStroke, lineWidth: 1)
+                .stroke(cardBorder, lineWidth: 1)
         }
     }
 
     private var showsChartSlot: Bool {
-        showsChart || (reservesChartSpace && points.isEmpty)
+        showsChart || reservesChartSpace
     }
 
     private var showsChart: Bool {
         points.count > 1
+    }
+
+    private var cardBorder: Color {
+        onSelect == nil ? Color.dashboardStroke : accentColor.opacity(0.20)
     }
 }
 
@@ -1222,12 +1278,23 @@ private struct HealthSeriesSection: View {
 
             if series.count == 1 {
                 ForEach(series) { item in
-                    HealthSeriesCard(series: item, units: units, onSelectMetric: onSelectMetric)
+                    HealthSeriesCard(
+                        series: item,
+                        units: units,
+                        reservesChartSpace: false,
+                        onSelectMetric: onSelectMetric
+                    )
                 }
             } else {
+                let reservesChartSpace = series.contains { $0.points.count > 1 }
                 LazyVGrid(columns: columns, spacing: 12) {
                     ForEach(series) { item in
-                        HealthSeriesCard(series: item, units: units, onSelectMetric: onSelectMetric)
+                        HealthSeriesCard(
+                            series: item,
+                            units: units,
+                            reservesChartSpace: reservesChartSpace,
+                            onSelectMetric: onSelectMetric
+                        )
                     }
                 }
             }
@@ -1238,6 +1305,7 @@ private struct HealthSeriesSection: View {
 private struct HealthSeriesCard: View {
     let series: NumericMetricSeries
     let units: UnitPreferences
+    let reservesChartSpace: Bool
     let onSelectMetric: (GoogleHealthDataType) -> Void
 
     var body: some View {
@@ -1249,7 +1317,7 @@ private struct HealthSeriesCard: View {
             systemImage: series.type.symbolName,
             accentColor: series.type.accentColor,
             points: chartPoints,
-            reservesChartSpace: chartPoints.count > 1,
+            reservesChartSpace: reservesChartSpace,
             isAvailable: series.latestPoint != nil
         ) {
             onSelectMetric(series.type)
@@ -1269,7 +1337,7 @@ private struct HealthSeriesCard: View {
         }
 
         if series.points.count <= 1 {
-            return "Measured \(latest.startDate.formatted(date: .abbreviated, time: .shortened))"
+            return "Measured \(DashboardFormatting.compactDateTimeLabel(for: latest.startDate))"
         }
 
         return series.rangeSubtitle
@@ -1410,7 +1478,7 @@ private struct SleepSessionsSection: View {
                     } label: {
                         HealthSleepSessionCard(session: session)
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(DashboardInteractiveCardButtonStyle())
                 }
             }
         }
@@ -1422,12 +1490,12 @@ private struct HealthSleepSessionCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .top, spacing: 12) {
+            HStack(alignment: .top, spacing: 8) {
                 Image(systemName: "moon.zzz.fill")
                     .font(.headline.weight(.bold))
                     .symbolRenderingMode(.hierarchical)
                     .foregroundStyle(.sleepAccent)
-                    .frame(width: 38, height: 38)
+                    .frame(width: 34, height: 34)
                     .background(Color.sleepAccent.opacity(0.16), in: Circle())
 
                 VStack(alignment: .leading, spacing: 4) {
@@ -1438,16 +1506,17 @@ private struct HealthSleepSessionCard: View {
                     Text(sleepRange)
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.74)
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.70)
+                        .allowsTightening(true)
                 }
                 .layoutPriority(1)
 
-                Spacer(minLength: 0)
-
-                Image(systemName: "chevron.right")
-                    .font(.headline.weight(.bold))
-                    .foregroundStyle(.tertiary)
+                Spacer(minLength: 30)
+            }
+            .frame(minHeight: 48, alignment: .topLeading)
+            .overlay(alignment: .topTrailing) {
+                DashboardActionIndicator(accentColor: .sleepAccent, size: 30)
             }
 
             HStack(alignment: .lastTextBaseline, spacing: 4) {
@@ -1457,6 +1526,7 @@ private struct HealthSleepSessionCard: View {
                     .lineLimit(1)
                     .minimumScaleFactor(0.54)
                     .allowsTightening(true)
+                    .layoutPriority(1)
 
                 if !duration.unit.isEmpty {
                     Text(duration.unit)
@@ -1474,9 +1544,10 @@ private struct HealthSleepSessionCard: View {
         .background(.summarySurface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .stroke(.dashboardStroke, lineWidth: 1)
+                .stroke(Color.sleepAccent.opacity(0.18), lineWidth: 1)
         }
         .accessibilityElement(children: .combine)
+        .accessibilityHint("Opens sleep details")
     }
 
     private var duration: DashboardFormatting.MetricValue {
@@ -1487,7 +1558,10 @@ private struct HealthSleepSessionCard: View {
         guard session.startTime != nil || session.endTime != nil else {
             return "Sleep session"
         }
-        return "\(DashboardFormatting.time(session.startTime)) - \(DashboardFormatting.time(session.endTime))"
+
+        let dateLabel = DashboardFormatting.compactRangeLabel(start: session.startTime, end: session.endTime)
+        let timeRange = "\(DashboardFormatting.time(session.startTime))-\(DashboardFormatting.time(session.endTime))"
+        return [dateLabel, timeRange].compactMap { $0 }.joined(separator: " ")
     }
 }
 
@@ -1565,7 +1639,7 @@ private struct WorkoutRowCard: View {
             title: workout.type,
             value: DashboardFormatting.durationParts(workout.durationSeconds).value,
             unit: DashboardFormatting.durationParts(workout.durationSeconds).unit,
-            subtitle: workout.startTime.formatted(date: .abbreviated, time: .shortened),
+            subtitle: DashboardFormatting.compactDateTimeLabel(for: workout.startTime),
             systemImage: "dumbbell.fill",
             accentColor: .activeRing,
             points: [],
@@ -1675,7 +1749,7 @@ private struct MetricPointList: View {
             ForEach(series.points.sorted { $0.startDate > $1.startDate }) { point in
                 let value = DashboardFormatting.metricValue(point.value, type: series.type, units: units)
                 HStack {
-                    Text(point.startDate.formatted(date: .abbreviated, time: .shortened))
+                    Text(DashboardFormatting.compactDateTimeLabel(for: point.startDate))
                         .font(.subheadline.weight(.semibold))
                     Spacer()
                     Text(value.unit.isEmpty ? value.value : "\(value.value) \(value.unit)")
@@ -1695,25 +1769,58 @@ private struct MetricBarChart: View {
 
     var body: some View {
         GeometryReader { geometry in
-            let maxValue = max(points.map(\.value).max() ?? 0, 1)
-            HStack(alignment: .bottom, spacing: 3) {
-                ForEach(points.suffix(24)) { point in
-                    Capsule()
-                        .fill(color.opacity(0.82))
-                        .frame(
-                            width: barWidth(in: geometry.size.width),
-                            height: max(3, geometry.size.height * CGFloat(max(0, point.value) / maxValue))
-                        )
+            let chartPoints = Array(points.suffix(24))
+            let maxValue = max(chartPoints.map { max(0, $0.value) }.max() ?? 0, 1)
+            let barWidth = barWidth(in: geometry.size.width, count: chartPoints.count)
+
+            ZStack(alignment: .bottomLeading) {
+                Path { path in
+                    let baselineY = geometry.size.height - 0.5
+                    let guideY = geometry.size.height * 0.42
+                    path.move(to: CGPoint(x: 0, y: baselineY))
+                    path.addLine(to: CGPoint(x: geometry.size.width, y: baselineY))
+                    path.move(to: CGPoint(x: 0, y: guideY))
+                    path.addLine(to: CGPoint(x: geometry.size.width, y: guideY))
                 }
+                .stroke(Color.dashboardStroke.opacity(0.42), style: StrokeStyle(lineWidth: 1, dash: [3, 4]))
+
+                HStack(alignment: .bottom, spacing: 0) {
+                    ForEach(chartPoints) { point in
+                        let normalizedValue = max(0, point.value) / maxValue
+                        RoundedRectangle(cornerRadius: min(5, barWidth / 2), style: .continuous)
+                            .fill(
+                                LinearGradient(
+                                    colors: [color.opacity(0.62), color.opacity(0.95)],
+                                    startPoint: .bottom,
+                                    endPoint: .top
+                                )
+                            )
+                            .frame(
+                                width: barWidth,
+                                height: barHeight(
+                                    normalizedValue: normalizedValue,
+                                    value: point.value,
+                                    maxHeight: geometry.size.height - 5
+                                )
+                            )
+                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+                    }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
         }
         .accessibilityHidden(true)
     }
 
-    private func barWidth(in width: CGFloat) -> CGFloat {
-        let count = CGFloat(max(points.suffix(24).count, 1))
-        return max(4, (width - ((count - 1) * 3)) / count)
+    private func barWidth(in width: CGFloat, count: Int) -> CGFloat {
+        guard count > 0 else { return 4 }
+        let slotWidth = width / CGFloat(count)
+        return min(12, max(4, slotWidth * 0.42))
+    }
+
+    private func barHeight(normalizedValue: Double, value: Double, maxHeight: CGFloat) -> CGFloat {
+        guard value > 0 else { return 2 }
+        return max(4, maxHeight * CGFloat(normalizedValue))
     }
 }
 
@@ -1791,7 +1898,7 @@ private extension NumericMetricSeries {
         guard let start = rangeStart, let end = rangeEnd else {
             return "Last 14 days"
         }
-        return "\(start.formatted(date: .abbreviated, time: .omitted)) - \(end.formatted(date: .abbreviated, time: .omitted))"
+        return DashboardFormatting.compactRangeLabel(start: start, end: end)
     }
 }
 
@@ -1800,7 +1907,7 @@ private extension BucketedMetricSeries {
         guard let start = rangeStart, let end = rangeEnd else {
             return "Last 14 days"
         }
-        return "\(start.formatted(date: .abbreviated, time: .omitted)) - \(end.formatted(date: .abbreviated, time: .omitted))"
+        return DashboardFormatting.compactRangeLabel(start: start, end: end)
     }
 }
 
