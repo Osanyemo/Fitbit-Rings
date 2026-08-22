@@ -176,9 +176,7 @@ struct TodayGoalsSection: View {
             return nil
         }
 
-        let dateLabel = DashboardFormatting.compactRangeLabel(start: sleep.startTime, end: sleep.endTime)
-        let timeRange = "\(DashboardFormatting.time(sleep.startTime))-\(DashboardFormatting.time(sleep.endTime))"
-        return [dateLabel, timeRange].compactMap { $0 }.joined(separator: " ")
+        return DashboardFormatting.compactDateTimeRangeLabel(start: sleep.startTime, end: sleep.endTime)
     }
 
     private var sectionAnimation: Animation? {

@@ -395,9 +395,7 @@ private struct HealthOverviewSection: View {
             return "Last sleep"
         }
 
-        let dateLabel = DashboardFormatting.compactRangeLabel(start: session.startTime, end: session.endTime)
-        let timeRange = "\(DashboardFormatting.time(session.startTime))-\(DashboardFormatting.time(session.endTime))"
-        return [dateLabel, timeRange].compactMap { $0 }.joined(separator: " ")
+        return DashboardFormatting.compactDateTimeRangeLabel(start: session.startTime, end: session.endTime) ?? "Last sleep"
     }
 
     private func select(_ item: HealthOverviewItem) {
@@ -672,9 +670,7 @@ private struct SleepDetailView: View {
     }
 
     private var sleepRange: String {
-        let dateLabel = DashboardFormatting.compactRangeLabel(start: session.startTime, end: session.endTime)
-        let timeRange = "\(DashboardFormatting.time(session.startTime))-\(DashboardFormatting.time(session.endTime))"
-        return [dateLabel, timeRange].compactMap { $0 }.joined(separator: " ")
+        return DashboardFormatting.compactDateTimeRangeLabel(start: session.startTime, end: session.endTime) ?? "Sleep session"
     }
 }
 
@@ -1565,9 +1561,7 @@ private struct HealthSleepSessionCard: View {
             return "Sleep session"
         }
 
-        let dateLabel = DashboardFormatting.compactRangeLabel(start: session.startTime, end: session.endTime)
-        let timeRange = "\(DashboardFormatting.time(session.startTime))-\(DashboardFormatting.time(session.endTime))"
-        return [dateLabel, timeRange].compactMap { $0 }.joined(separator: " ")
+        return DashboardFormatting.compactDateTimeRangeLabel(start: session.startTime, end: session.endTime) ?? "Sleep session"
     }
 }
 

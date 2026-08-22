@@ -111,6 +111,21 @@ enum DashboardFormatting {
         }
     }
 
+    static func compactDateTimeRangeLabel(
+        start: Date?,
+        end: Date?,
+        relativeTo now: Date = .now,
+        calendar: Calendar = .current
+    ) -> String? {
+        guard start != nil || end != nil else {
+            return nil
+        }
+
+        let dateLabel = compactRangeLabel(start: start, end: end, relativeTo: now, calendar: calendar)
+        let timeRange = "\(time(start))-\(time(end))"
+        return [dateLabel, timeRange].compactMap { $0 }.joined(separator: "  |  ")
+    }
+
     static func relativeUpdate(_ date: Date) -> String {
         guard date > .distantPast else { return "Not synced yet" }
         let formatter = RelativeDateTimeFormatter()

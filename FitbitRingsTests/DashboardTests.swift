@@ -467,6 +467,26 @@ final class DashboardTests: XCTestCase {
         )
     }
 
+    func testCompactDateTimeRangeLabelSeparatesDateAndTime() throws {
+        let calendar = utcCalendar()
+        let now = try date(year: 2026, month: 8, day: 22, calendar: calendar)
+        let start = try date(year: 2026, month: 8, day: 20, hour: 23, minute: 37, calendar: calendar)
+        let end = try date(year: 2026, month: 8, day: 21, hour: 7, minute: 31, calendar: calendar)
+
+        let label = try XCTUnwrap(
+            DashboardFormatting.compactDateTimeRangeLabel(
+                start: start,
+                end: end,
+                relativeTo: now,
+                calendar: calendar
+            )
+        )
+        let parts = label.components(separatedBy: "  |  ")
+
+        XCTAssertEqual(parts.count, 2)
+        XCTAssertEqual(parts.first, "Aug 20-Aug 21")
+    }
+
     func testMissingScopesErrorNamesScopes() {
         let error = AuthenticationError.missingScopes(["scope-a", "scope-b"])
 
