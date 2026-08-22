@@ -760,6 +760,80 @@ final class GoogleHealthDecodingTests: XCTestCase {
         XCTAssertEqual(snapshot.sleep?.durationSeconds, 23_400)
     }
 
+    func testSleepSummaryAwakeOnlyDoesNotCreateStageBreakdown() throws {
+        let json = """
+        {
+          "dataPoints": [
+            {
+              "sleep": {
+                "interval": {
+                  "startTime": "2026-08-20T03:37:00Z",
+                  "endTime": "2026-08-20T11:24:00Z"
+                },
+                "summary": {
+                  "minutesInSleepPeriod": "467",
+                  "minutesAwake": "467"
+                }
+              }
+            }
+          ]
+        }
+        """.data(using: .utf8)!
+
+        let decoded = try JSONDecoder.googleHealthDecoder.decode(
+            GoogleHealthListResponse.self,
+            from: json
+        )
+        let health = GoogleHealthMapper.mapHealthData(
+            records: [.sleep: decoded.dataPoints],
+            range: DateInterval(start: Date(timeIntervalSince1970: 0), duration: 86_400)
+        )
+        let session = try XCTUnwrap(health.sleepSessions.first)
+
+        XCTAssertEqual(session.durationSeconds, 28_020)
+        XCTAssertTrue(session.stages.isEmpty)
+    }
+
+    func testSleepSummaryBuildsAsleepAwakeBreakdownWhenBothValuesAreAvailable() throws {
+        let json = """
+        {
+          "dataPoints": [
+            {
+              "sleep": {
+                "interval": {
+                  "startTime": "2026-08-20T04:00:00Z",
+                  "endTime": "2026-08-20T11:00:00Z"
+                },
+                "summary": {
+                  "minutesAsleep": "390",
+                  "minutesAwake": "30"
+                }
+              }
+            }
+          ]
+        }
+        """.data(using: .utf8)!
+
+        let decoded = try JSONDecoder.googleHealthDecoder.decode(
+            GoogleHealthListResponse.self,
+            from: json
+        )
+        let health = GoogleHealthMapper.mapHealthData(
+            records: [.sleep: decoded.dataPoints],
+            range: DateInterval(start: Date(timeIntervalSince1970: 0), duration: 86_400)
+        )
+        let session = try XCTUnwrap(health.sleepSessions.first)
+
+        XCTAssertEqual(session.durationSeconds, 23_400)
+        XCTAssertEqual(
+            session.stages,
+            [
+                SleepStageSummary(stage: "Asleep", durationSeconds: 23_400),
+                SleepStageSummary(stage: "Awake", durationSeconds: 1_800)
+            ]
+        )
+    }
+
     func testGoogleHealthClientBuildsV4RequestShapes() async throws {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(secondsFromGMT: 0)!

@@ -665,24 +665,110 @@ enum GoogleHealthMapper {
             let value = stage.durationSeconds?.doubleValue
                 ?? stage.durationMillis.map { $0.doubleValue / 1_000 }
                 ?? stage.minutes.map { $0.doubleValue * 60 }
-            guard let value else { return nil }
+            guard let value, value > 0 else { return nil }
             return SleepStageSummary(
-                stage: (stage.stage ?? stage.sleepStage ?? "Stage").displayNameFromEnum,
+                stage: canonicalSleepStageName(stage.stage ?? stage.sleepStage ?? "Stage"),
                 durationSeconds: value
             )
         }
         if !fromList.isEmpty {
-            return fromList
+            return aggregateSleepStages(fromList)
         }
 
         let summaryStages: [(String, GoogleHealthNumericValue?)] = [
-            ("Awake", sleep.summary?.minutesAwake),
             ("Deep", sleep.summary?.minutesDeep),
             ("Light", sleep.summary?.minutesLight),
-            ("REM", sleep.summary?.minutesRem)
+            ("REM", sleep.summary?.minutesRem),
+            ("Awake", sleep.summary?.minutesAwake)
         ]
-        return summaryStages.compactMap { stage, minutes in
-            minutes.map { SleepStageSummary(stage: stage, durationSeconds: $0.doubleValue * 60) }
+        let stageBreakdown = summaryStages.compactMap { stage, minutes in
+            sleepStageSummary(stage: stage, minutes: minutes)
+        }
+        if stageBreakdown.contains(where: { !isAwakeStage($0.stage) }) {
+            return aggregateSleepStages(stageBreakdown)
+        }
+
+        if let minutesAsleep = sleep.summary?.minutesAsleep?.doubleValue,
+           let minutesAwake = sleep.summary?.minutesAwake?.doubleValue,
+           minutesAsleep > 0,
+           minutesAwake > 0 {
+            return [
+                SleepStageSummary(stage: "Asleep", durationSeconds: minutesAsleep * 60),
+                SleepStageSummary(stage: "Awake", durationSeconds: minutesAwake * 60)
+            ]
+        }
+
+        return []
+    }
+
+    private static func sleepStageSummary(
+        stage: String,
+        minutes: GoogleHealthNumericValue?
+    ) -> SleepStageSummary? {
+        guard let minutes = minutes?.doubleValue, minutes > 0 else { return nil }
+        return SleepStageSummary(stage: stage, durationSeconds: minutes * 60)
+    }
+
+    private static func aggregateSleepStages(_ stages: [SleepStageSummary]) -> [SleepStageSummary] {
+        var totals: [String: TimeInterval] = [:]
+        var labels: [String: String] = [:]
+
+        for stage in stages where stage.durationSeconds > 0 {
+            let label = canonicalSleepStageName(stage.stage)
+            let key = label.lowercased()
+            totals[key, default: 0] += stage.durationSeconds
+            labels[key] = label
+        }
+
+        return totals.map { key, duration in
+            SleepStageSummary(stage: labels[key] ?? key.displayNameFromEnum, durationSeconds: duration)
+        }
+        .sorted {
+            sleepStageOrder($0.stage) < sleepStageOrder($1.stage)
+        }
+    }
+
+    private static func canonicalSleepStageName(_ stage: String) -> String {
+        let displayName = stage.displayNameFromEnum
+        let normalizedStage = displayName.lowercased()
+
+        if normalizedStage.contains("rem") {
+            return "REM"
+        }
+        if normalizedStage.contains("deep") {
+            return "Deep"
+        }
+        if normalizedStage.contains("light") {
+            return "Light"
+        }
+        if normalizedStage.contains("awake") || normalizedStage.contains("wake") {
+            return "Awake"
+        }
+        if normalizedStage.contains("asleep") || normalizedStage == "sleep" {
+            return "Asleep"
+        }
+        return displayName
+    }
+
+    private static func isAwakeStage(_ stage: String) -> Bool {
+        let normalizedStage = stage.lowercased()
+        return normalizedStage.contains("awake") || normalizedStage.contains("wake")
+    }
+
+    private static func sleepStageOrder(_ stage: String) -> Int {
+        switch canonicalSleepStageName(stage) {
+        case "Deep":
+            return 0
+        case "Light":
+            return 1
+        case "REM":
+            return 2
+        case "Asleep":
+            return 3
+        case "Awake":
+            return 4
+        default:
+            return 5
         }
     }
 

@@ -645,13 +645,13 @@ private struct SleepDetailView: View {
                     isAvailable: session.durationSeconds != nil || session.startTime != nil || session.endTime != nil
                 )
 
-                if session.stages.isEmpty {
-                    DashboardEmptyState(title: "No stage data", systemImage: "bed.double")
+                if session.displayStages.isEmpty {
+                    DashboardEmptyState(title: "No stage breakdown", systemImage: "bed.double")
                 } else {
                     VStack(alignment: .leading, spacing: 12) {
                         Text("Stages")
                             .font(.title2.weight(.bold))
-                        ForEach(session.stages) { stage in
+                        ForEach(session.displayStages) { stage in
                             HStack {
                                 Text(stage.stage)
                                     .font(.headline)
@@ -1542,8 +1542,8 @@ private struct HealthSleepSessionCard: View {
                 }
             }
 
-            if !session.stages.isEmpty {
-                SleepStageStrip(stages: session.stages)
+            if !session.displayStages.isEmpty {
+                SleepStageStrip(stages: session.displayStages)
             }
         }
         .padding(15)
@@ -1570,6 +1570,36 @@ private struct HealthSleepSessionCard: View {
     }
 }
 
+private extension SleepSession {
+    var displayStages: [SleepStageSummary] {
+        let positiveStages = stages.filter { $0.durationSeconds > 0 }
+        guard positiveStages.count > 1 else { return [] }
+
+        var orderedKeys: [String] = []
+        var labels: [String: String] = [:]
+        var totals: [String: TimeInterval] = [:]
+
+        for stage in positiveStages {
+            let key = stage.stage.lowercased()
+            if totals[key] == nil {
+                orderedKeys.append(key)
+            }
+            labels[key] = stage.stage
+            totals[key, default: 0] += stage.durationSeconds
+        }
+
+        let aggregatedStages = orderedKeys.compactMap { key -> SleepStageSummary? in
+            guard let duration = totals[key], let label = labels[key] else {
+                return nil
+            }
+            return SleepStageSummary(stage: label, durationSeconds: duration)
+        }
+
+        guard aggregatedStages.count > 1 else { return [] }
+        return aggregatedStages
+    }
+}
+
 private struct SleepStageStrip: View {
     let stages: [SleepStageSummary]
 
@@ -1577,7 +1607,8 @@ private struct SleepStageStrip: View {
         VStack(alignment: .leading, spacing: 9) {
             GeometryReader { geometry in
                 HStack(spacing: 3) {
-                    ForEach(stages) { stage in
+                    ForEach(indexedStages, id: \.offset) { indexedStage in
+                        let stage = indexedStage.element
                         Capsule()
                             .fill(color(for: stage.stage).opacity(0.9))
                             .frame(width: segmentWidth(for: stage, totalWidth: geometry.size.width))
@@ -1586,16 +1617,27 @@ private struct SleepStageStrip: View {
             }
             .frame(height: 8)
 
-            HStack(spacing: 10) {
-                ForEach(stages.prefix(3)) { stage in
-                    HStack(spacing: 5) {
+            LazyVGrid(columns: legendColumns, alignment: .leading, spacing: 7) {
+                ForEach(indexedStages, id: \.offset) { indexedStage in
+                    let stage = indexedStage.element
+                    HStack(alignment: .top, spacing: 6) {
                         Circle()
                             .fill(color(for: stage.stage))
                             .frame(width: 6, height: 6)
+                            .padding(.top, 4)
 
-                        Text(stage.stage)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.72)
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text(stage.stage)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.72)
+
+                            Text(stageDetail(for: stage))
+                                .font(.caption2.weight(.medium))
+                                .monospacedDigit()
+                                .foregroundStyle(.tertiary)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.72)
+                        }
                     }
                 }
             }
@@ -1609,8 +1651,22 @@ private struct SleepStageStrip: View {
         max(stages.reduce(0) { $0 + $1.durationSeconds }, 1)
     }
 
+    private var indexedStages: [(offset: Int, element: SleepStageSummary)] {
+        Array(stages.enumerated())
+    }
+
+    private var legendColumns: [GridItem] {
+        [
+            GridItem(.adaptive(minimum: 82), spacing: 8, alignment: .leading)
+        ]
+    }
+
     private func segmentWidth(for stage: SleepStageSummary, totalWidth: CGFloat) -> CGFloat {
         max(6, totalWidth * CGFloat(stage.durationSeconds / totalDuration))
+    }
+
+    private func stageDetail(for stage: SleepStageSummary) -> String {
+        "\(DashboardFormatting.duration(stage.durationSeconds)) | \(DashboardFormatting.percent(stage.durationSeconds / totalDuration))"
     }
 
     private func color(for stage: String) -> Color {
