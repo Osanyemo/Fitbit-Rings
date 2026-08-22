@@ -50,6 +50,43 @@ final class GoogleHealthDecodingTests: XCTestCase {
         XCTAssertEqual(point.totalCalories?.kcalSum, 2100.75)
     }
 
+    func testGoogleHealthResponsesDecodeMissingRepeatedFieldsAsEmptyArrays() throws {
+        let emptyJSON = Data("{}".utf8)
+
+        let rollup = try JSONDecoder.googleHealthDecoder.decode(
+            GoogleHealthRollUpResponse.self,
+            from: emptyJSON
+        )
+        let list = try JSONDecoder.googleHealthDecoder.decode(
+            GoogleHealthListResponse.self,
+            from: emptyJSON
+        )
+        let activeMinutes = try JSONDecoder.googleHealthDecoder.decode(
+            GoogleHealthActiveMinutesRollup.self,
+            from: emptyJSON
+        )
+
+        XCTAssertTrue(rollup.rollupDataPoints.isEmpty)
+        XCTAssertTrue(list.dataPoints.isEmpty)
+        XCTAssertTrue(activeMinutes.activeMinutesRollupByActivityLevel.isEmpty)
+    }
+
+    func testGoogleHealthCivilTimeDefaultsMissingNanosToZero() throws {
+        let json = """
+        {
+          "date": { "year": 2026, "month": 8, "day": 21 },
+          "time": { "hours": 9, "minutes": 15, "seconds": 30 }
+        }
+        """.data(using: .utf8)!
+
+        let decoded = try JSONDecoder.googleHealthDecoder.decode(
+            GoogleHealthCivilDateTime.self,
+            from: json
+        )
+
+        XCTAssertEqual(decoded.time?.nanos, 0)
+    }
+
     func testMapperBuildsDashboardFromV4Rollups() throws {
         let snapshot = GoogleHealthMapper.map(
             goals: .defaultGoals,
@@ -695,6 +732,22 @@ final class GoogleHealthDecodingTests: XCTestCase {
         )
     }
 
+    func testGoogleHealthClientTreatsMissingResponseArraysAsNoData() async throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+
+        let client = GoogleHealthClient(networkClient: EmptyPayloadHTTPClient(), calendar: calendar)
+        let date = calendar.date(from: DateComponents(year: 2026, month: 8, day: 20, hour: 12))!
+
+        let snapshot = try await client.fetchDashboard(goals: .defaultGoals, date: date)
+
+        XCTAssertFalse(snapshot.activity.hasAnyData)
+        XCTAssertNil(snapshot.latestWorkout)
+        XCTAssertNil(snapshot.heart.mostRecentHeartRate)
+        XCTAssertNil(snapshot.sleep)
+        XCTAssertEqual(snapshot.syncState, .idle)
+    }
+
     func testGoogleHealthClientBuildsActivityRollupAndReconcileRequests() async throws {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(secondsFromGMT: 0)!
@@ -816,6 +869,12 @@ private final class CapturingHTTPClient: HTTPClient {
 
     func recordedRequests() -> [URLRequest] {
         queue.sync { requests }
+    }
+}
+
+private final class EmptyPayloadHTTPClient: HTTPClient {
+    func send<T: Decodable>(_ request: URLRequest, decoding type: T.Type) async throws -> T {
+        try JSONDecoder.googleHealthDecoder.decode(T.self, from: Data("{}".utf8))
     }
 }
 

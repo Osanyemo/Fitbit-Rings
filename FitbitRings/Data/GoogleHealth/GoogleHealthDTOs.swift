@@ -3,6 +3,25 @@ import Foundation
 struct GoogleHealthRollUpResponse: Decodable {
     var rollupDataPoints: [GoogleHealthRollupDataPoint]
     var nextPageToken: String? = nil
+
+    private enum CodingKeys: String, CodingKey {
+        case rollupDataPoints
+        case nextPageToken
+    }
+
+    init(rollupDataPoints: [GoogleHealthRollupDataPoint] = [], nextPageToken: String? = nil) {
+        self.rollupDataPoints = rollupDataPoints
+        self.nextPageToken = nextPageToken
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        rollupDataPoints = try container.decodeIfPresent(
+            [GoogleHealthRollupDataPoint].self,
+            forKey: .rollupDataPoints
+        ) ?? []
+        nextPageToken = try container.decodeIfPresent(String.self, forKey: .nextPageToken)
+    }
 }
 
 struct GoogleHealthRollupDataPoint: Decodable {
@@ -42,6 +61,22 @@ struct GoogleHealthStepsRollup: Decodable {
 
 struct GoogleHealthActiveMinutesRollup: Decodable {
     var activeMinutesRollupByActivityLevel: [GoogleHealthActiveMinutesByActivityLevel]
+
+    private enum CodingKeys: String, CodingKey {
+        case activeMinutesRollupByActivityLevel
+    }
+
+    init(activeMinutesRollupByActivityLevel: [GoogleHealthActiveMinutesByActivityLevel] = []) {
+        self.activeMinutesRollupByActivityLevel = activeMinutesRollupByActivityLevel
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        activeMinutesRollupByActivityLevel = try container.decodeIfPresent(
+            [GoogleHealthActiveMinutesByActivityLevel].self,
+            forKey: .activeMinutesRollupByActivityLevel
+        ) ?? []
+    }
 }
 
 struct GoogleHealthActiveMinutesByActivityLevel: Decodable {
@@ -151,6 +186,22 @@ struct GoogleHealthHeartRateRollup: Decodable {
 struct GoogleHealthListResponse: Decodable {
     var dataPoints: [GoogleHealthDataPoint]
     var nextPageToken: String? = nil
+
+    private enum CodingKeys: String, CodingKey {
+        case dataPoints
+        case nextPageToken
+    }
+
+    init(dataPoints: [GoogleHealthDataPoint] = [], nextPageToken: String? = nil) {
+        self.dataPoints = dataPoints
+        self.nextPageToken = nextPageToken
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        dataPoints = try container.decodeIfPresent([GoogleHealthDataPoint].self, forKey: .dataPoints) ?? []
+        nextPageToken = try container.decodeIfPresent(String.self, forKey: .nextPageToken)
+    }
 }
 
 struct GoogleHealthDataPoint: Decodable {
@@ -511,6 +562,28 @@ struct GoogleHealthTimeOfDay: Codable, Hashable, Sendable {
     var minutes: Int
     var seconds: Int
     var nanos: Int = 0
+
+    private enum CodingKeys: String, CodingKey {
+        case hours
+        case minutes
+        case seconds
+        case nanos
+    }
+
+    init(hours: Int, minutes: Int, seconds: Int, nanos: Int = 0) {
+        self.hours = hours
+        self.minutes = minutes
+        self.seconds = seconds
+        self.nanos = nanos
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        hours = try container.decode(Int.self, forKey: .hours)
+        minutes = try container.decode(Int.self, forKey: .minutes)
+        seconds = try container.decode(Int.self, forKey: .seconds)
+        nanos = try container.decodeIfPresent(Int.self, forKey: .nanos) ?? 0
+    }
 }
 
 struct GoogleHealthRollUpRequest: Encodable {

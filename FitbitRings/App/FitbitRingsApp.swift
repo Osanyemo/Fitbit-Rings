@@ -1,3 +1,4 @@
+import Foundation
 import SwiftData
 import SwiftUI
 
@@ -7,10 +8,7 @@ struct FitbitRingsApp: App {
 
     init() {
         do {
-            container = try ModelContainer(
-                for: CachedDashboardSnapshot.self,
-                CachedPreferences.self
-            )
+            container = try Self.makeModelContainer()
         } catch {
             fatalError("Unable to create SwiftData container: \(error)")
         }
@@ -21,5 +19,32 @@ struct FitbitRingsApp: App {
             RootView()
                 .modelContainer(container)
         }
+    }
+
+    private static func makeModelContainer() throws -> ModelContainer {
+        let storeURL = try persistentStoreURL()
+        let configuration = ModelConfiguration(url: storeURL)
+
+        return try ModelContainer(
+            for: CachedDashboardSnapshot.self,
+            CachedPreferences.self,
+            configurations: configuration
+        )
+    }
+
+    private static func persistentStoreURL(fileManager: FileManager = .default) throws -> URL {
+        let supportDirectory = try fileManager.url(
+            for: .applicationSupportDirectory,
+            in: .userDomainMask,
+            appropriateFor: nil,
+            create: true
+        )
+
+        try fileManager.createDirectory(
+            at: supportDirectory,
+            withIntermediateDirectories: true
+        )
+
+        return supportDirectory.appendingPathComponent("default.store")
     }
 }
