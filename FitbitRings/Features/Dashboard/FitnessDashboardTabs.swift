@@ -301,8 +301,8 @@ private struct HealthOverviewSection: View {
     let onSelectSleep: (String) -> Void
 
     private let columns = [
-        GridItem(.flexible(), spacing: 12),
-        GridItem(.flexible(), spacing: 12)
+        GridItem(.flexible(), spacing: 12, alignment: .top),
+        GridItem(.flexible(), spacing: 12, alignment: .top)
     ]
 
     @ViewBuilder
@@ -445,32 +445,31 @@ private struct HealthOverviewCard: View {
                     .font(.headline.weight(.bold))
                     .symbolRenderingMode(.hierarchical)
                     .foregroundStyle(item.accentColor)
-                    .frame(width: 34, height: 34)
+                    .frame(width: 32, height: 32)
                     .background(item.accentColor.opacity(0.16), in: Circle())
 
                 VStack(alignment: .leading, spacing: 3) {
                     Text(item.title)
                         .font(.subheadline.weight(.bold))
                         .foregroundStyle(.primary)
-                        .lineLimit(2)
-                        .minimumScaleFactor(0.68)
+                        .lineLimit(2, reservesSpace: true)
+                        .minimumScaleFactor(0.62)
                         .allowsTightening(true)
-                        .fixedSize(horizontal: false, vertical: true)
 
                     Text(item.subtitle)
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(.secondary)
-                        .lineLimit(2)
+                        .lineLimit(2, reservesSpace: true)
                         .minimumScaleFactor(0.72)
                         .allowsTightening(true)
                 }
                 .layoutPriority(1)
 
-                Spacer(minLength: 28)
+                Spacer(minLength: 24)
             }
             .frame(minHeight: 48, alignment: .topLeading)
             .overlay(alignment: .topTrailing) {
-                DashboardActionIndicator(accentColor: item.accentColor, size: 28)
+                DashboardActionIndicator(accentColor: item.accentColor, size: 26)
             }
 
             Spacer(minLength: 0)
@@ -493,8 +492,8 @@ private struct HealthOverviewCard: View {
                 }
             }
         }
-        .padding(15)
-        .frame(maxWidth: .infinity, minHeight: 148, alignment: .topLeading)
+        .padding(14)
+        .frame(maxWidth: .infinity, minHeight: 156, alignment: .topLeading)
         .background(overviewBackground, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: 8, style: .continuous)
@@ -1108,42 +1107,43 @@ struct DashboardMetricCard: View {
 
     private var cardContent: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .top, spacing: 8) {
+            HStack(alignment: .top, spacing: 7) {
                 Image(systemName: systemImage)
                     .font(.headline.weight(.bold))
                     .symbolRenderingMode(.hierarchical)
                     .foregroundStyle(accentColor)
-                    .frame(width: 32, height: 32)
+                    .frame(width: 30, height: 30)
                     .background(accentColor.opacity(0.15), in: Circle())
 
                 VStack(alignment: .leading, spacing: 3) {
                     Text(title)
                         .font(.subheadline.weight(.bold))
                         .foregroundStyle(.primary)
-                        .lineLimit(2)
-                        .minimumScaleFactor(0.68)
+                        .lineLimit(2, reservesSpace: true)
+                        .minimumScaleFactor(0.60)
                         .allowsTightening(true)
-                        .fixedSize(horizontal: false, vertical: true)
 
                     if let subtitle {
                         Text(subtitle)
                             .font(.caption.weight(.semibold))
                             .foregroundStyle(.secondary)
-                            .lineLimit(2)
+                            .lineLimit(2, reservesSpace: true)
                             .minimumScaleFactor(0.72)
                             .allowsTightening(true)
                     }
                 }
                 .layoutPriority(1)
 
-                Spacer(minLength: onSelect == nil ? 0 : 28)
+                Spacer(minLength: onSelect == nil ? 0 : 24)
             }
-            .frame(minHeight: 46, alignment: .topLeading)
+            .frame(minHeight: subtitle == nil ? 46 : 62, alignment: .topLeading)
             .overlay(alignment: .topTrailing) {
                 if onSelect != nil {
-                    DashboardActionIndicator(accentColor: accentColor, size: 28)
+                    DashboardActionIndicator(accentColor: accentColor, size: 26)
                 }
             }
+
+            Spacer(minLength: 0)
 
             HStack(alignment: .lastTextBaseline, spacing: 4) {
                 Text(isAvailable ? value : "No data")
@@ -1173,8 +1173,8 @@ struct DashboardMetricCard: View {
                     .accessibilityHidden(true)
             }
         }
-        .padding(15)
-        .frame(maxWidth: .infinity, minHeight: showsChartSlot ? 176 : 130, alignment: .topLeading)
+        .padding(14)
+        .frame(maxWidth: .infinity, minHeight: showsChartSlot ? 190 : 142, alignment: .topLeading)
         .background(.summarySurface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: 8, style: .continuous)
@@ -1635,34 +1635,175 @@ private struct WorkoutRowCard: View {
     let onSelect: (() -> Void)?
 
     var body: some View {
-        DashboardMetricCard(
-            title: workout.type,
-            value: DashboardFormatting.durationParts(workout.durationSeconds).value,
-            unit: DashboardFormatting.durationParts(workout.durationSeconds).unit,
-            subtitle: DashboardFormatting.compactDateTimeLabel(for: workout.startTime),
-            systemImage: "dumbbell.fill",
-            accentColor: .activeRing,
-            points: [],
-            isAvailable: true,
-            onSelect: onSelect
-        )
-        .overlay(alignment: .bottomLeading) {
-            HStack(spacing: 12) {
-                if let distance = workout.metricsSummary.distanceMeters {
-                    Label(DashboardFormatting.distance(distance, unit: units.distanceUnit), systemImage: "map")
+        if let onSelect {
+            Button(action: onSelect) {
+                cardContent
+            }
+            .buttonStyle(DashboardInteractiveCardButtonStyle())
+            .accessibilityElement(children: .combine)
+            .accessibilityHint("Opens workout details")
+        } else {
+            cardContent
+                .accessibilityElement(children: .combine)
+        }
+    }
+
+    private var cardContent: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack(alignment: .top, spacing: 12) {
+                Image(systemName: "dumbbell.fill")
+                    .font(.system(size: 18, weight: .bold))
+                    .symbolRenderingMode(.hierarchical)
+                    .foregroundStyle(.activeRing)
+                    .frame(width: 44, height: 44)
+                    .background(.activeRing.opacity(0.15), in: Circle())
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(workout.type)
+                        .font(.headline.weight(.bold))
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.72)
+                        .allowsTightening(true)
+
+                    Text(DashboardFormatting.compactDateTimeLabel(for: workout.startTime))
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.72)
+                        .allowsTightening(true)
                 }
-                if let calories = workout.metricsSummary.caloriesKcal {
-                    Label("\(DashboardFormatting.integer(calories)) kcal", systemImage: "flame")
-                }
-                if let steps = workout.metricsSummary.steps {
-                    Label(DashboardFormatting.integer(Double(steps)), systemImage: "shoeprints.fill")
+                .layoutPriority(1)
+
+                Spacer(minLength: onSelect == nil ? 0 : 32)
+            }
+            .frame(minHeight: 48, alignment: .topLeading)
+            .overlay(alignment: .topTrailing) {
+                if onSelect != nil {
+                    DashboardActionIndicator(accentColor: .activeRing, size: 30)
                 }
             }
-            .font(.caption.weight(.semibold))
-            .foregroundStyle(.secondary)
-            .padding(.horizontal, 16)
-            .padding(.bottom, 14)
+
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(alignment: .lastTextBaseline, spacing: 4) {
+                    Text(duration.value)
+                        .font(.system(size: 34, weight: .bold, design: .rounded))
+                        .monospacedDigit()
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.50)
+                        .allowsTightening(true)
+                        .layoutPriority(1)
+
+                    if !duration.unit.isEmpty {
+                        Text(duration.unit)
+                            .font(.headline.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.64)
+                    }
+                }
+
+                if !stats.isEmpty {
+                    WorkoutStatsRow(stats: stats)
+                }
+            }
         }
+        .padding(15)
+        .frame(maxWidth: .infinity, minHeight: 148, alignment: .topLeading)
+        .background(.summarySurface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .stroke(cardBorder, lineWidth: 1)
+        }
+    }
+
+    private var duration: DashboardFormatting.MetricValue {
+        DashboardFormatting.durationParts(workout.durationSeconds)
+    }
+
+    private var stats: [WorkoutStat] {
+        var stats: [WorkoutStat] = []
+
+        if let distance = workout.metricsSummary.distanceMeters {
+            stats.append(
+                WorkoutStat(
+                    id: "distance",
+                    text: DashboardFormatting.distance(distance, unit: units.distanceUnit),
+                    systemImage: "map"
+                )
+            )
+        }
+
+        if let calories = workout.metricsSummary.caloriesKcal {
+            stats.append(
+                WorkoutStat(
+                    id: "calories",
+                    text: "\(DashboardFormatting.integer(calories)) kcal",
+                    systemImage: "flame"
+                )
+            )
+        }
+
+        if let steps = workout.metricsSummary.steps {
+            stats.append(
+                WorkoutStat(
+                    id: "steps",
+                    text: DashboardFormatting.integer(Double(steps)),
+                    systemImage: "shoeprints.fill"
+                )
+            )
+        }
+
+        return stats
+    }
+
+    private var cardBorder: Color {
+        onSelect == nil ? Color.dashboardStroke : Color.activeRing.opacity(0.20)
+    }
+}
+
+private struct WorkoutStat: Identifiable {
+    let id: String
+    let text: String
+    let systemImage: String
+}
+
+private struct WorkoutStatsRow: View {
+    let stats: [WorkoutStat]
+
+    private let wrappedColumns = [
+        GridItem(.adaptive(minimum: 92), spacing: 12, alignment: .leading)
+    ]
+
+    var body: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(alignment: .firstTextBaseline, spacing: 18) {
+                ForEach(stats) { stat in
+                    WorkoutStatLabel(stat: stat)
+                        .fixedSize(horizontal: true, vertical: false)
+                }
+            }
+
+            LazyVGrid(columns: wrappedColumns, alignment: .leading, spacing: 6) {
+                ForEach(stats) { stat in
+                    WorkoutStatLabel(stat: stat)
+                }
+            }
+        }
+        .font(.caption.weight(.semibold))
+        .foregroundStyle(.secondary)
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+private struct WorkoutStatLabel: View {
+    let stat: WorkoutStat
+
+    var body: some View {
+        Label(stat.text, systemImage: stat.systemImage)
+            .lineLimit(1)
+            .minimumScaleFactor(0.72)
+            .allowsTightening(true)
     }
 }
 
