@@ -780,7 +780,8 @@ private struct ActivityTodayFocusSection: View {
     let onSelectMetric: (GoogleHealthDataType) -> Void
 
     private let columns = [
-        GridItem(.adaptive(minimum: 106), spacing: 14)
+        GridItem(.flexible(), spacing: 12),
+        GridItem(.flexible(), spacing: 12)
     ]
 
     var body: some View {
@@ -808,8 +809,8 @@ private struct ActivityTodayFocusSection: View {
                 onSelectMetric(primaryInsight.dataType)
             }
 
-            LazyVGrid(columns: columns, spacing: 14) {
-                ForEach(goalInsights) { insight in
+            LazyVGrid(columns: columns, spacing: 12) {
+                ForEach(supportingGoalInsights) { insight in
                     Button {
                         onSelectMetric(insight.dataType)
                     } label: {
@@ -846,6 +847,10 @@ private struct ActivityTodayFocusSection: View {
             .min { $0.progress < $1.progress }
             ?? goalInsights.first { $0.isAvailable }
             ?? goalInsights[0]
+    }
+
+    private var supportingGoalInsights: [ActivityGoalInsight] {
+        goalInsights.filter { $0.id != primaryInsight.id }
     }
 
     private var goalStatusText: String {
@@ -1019,9 +1024,11 @@ private struct ActivityGoalTile: View {
                     .font(.caption.weight(.bold))
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
-                    .minimumScaleFactor(0.72)
+                    .minimumScaleFactor(0.62)
+                    .allowsTightening(true)
+                    .layoutPriority(1)
 
-                Spacer(minLength: 0)
+                Spacer(minLength: 4)
 
                 DashboardActionIndicator(accentColor: insight.accentColor, size: 24)
             }
@@ -1106,7 +1113,7 @@ struct DashboardMetricCard: View {
     }
 
     private var cardContent: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .top, spacing: 7) {
                 Image(systemName: systemImage)
                     .font(.headline.weight(.bold))
@@ -1115,32 +1122,31 @@ struct DashboardMetricCard: View {
                     .frame(width: 30, height: 30)
                     .background(accentColor.opacity(0.15), in: Circle())
 
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(title)
-                        .font(.subheadline.weight(.bold))
-                        .foregroundStyle(.primary)
-                        .lineLimit(2, reservesSpace: true)
-                        .minimumScaleFactor(0.60)
-                        .allowsTightening(true)
-
-                    if let subtitle {
-                        Text(subtitle)
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(.secondary)
-                            .lineLimit(2, reservesSpace: true)
-                            .minimumScaleFactor(0.72)
-                            .allowsTightening(true)
-                    }
-                }
-                .layoutPriority(1)
+                Text(title)
+                    .font(.subheadline.weight(.bold))
+                    .foregroundStyle(.primary)
+                    .lineLimit(2, reservesSpace: true)
+                    .minimumScaleFactor(0.60)
+                    .allowsTightening(true)
+                    .layoutPriority(1)
 
                 Spacer(minLength: onSelect == nil ? 0 : 24)
             }
-            .frame(minHeight: subtitle == nil ? 46 : 62, alignment: .topLeading)
+            .frame(minHeight: 34, alignment: .topLeading)
             .overlay(alignment: .topTrailing) {
                 if onSelect != nil {
                     DashboardActionIndicator(accentColor: accentColor, size: 26)
                 }
+            }
+
+            if let subtitle {
+                Text(subtitle)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2, reservesSpace: true)
+                    .minimumScaleFactor(0.72)
+                    .allowsTightening(true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
 
             Spacer(minLength: 0)
@@ -1925,7 +1931,7 @@ private struct MetricBarChart: View {
                 }
                 .stroke(Color.dashboardStroke.opacity(0.42), style: StrokeStyle(lineWidth: 1, dash: [3, 4]))
 
-                HStack(alignment: .bottom, spacing: 0) {
+                HStack(alignment: .bottom, spacing: barSpacing(in: geometry.size.width, count: chartPoints.count)) {
                     ForEach(chartPoints) { point in
                         let normalizedValue = max(0, point.value) / maxValue
                         RoundedRectangle(cornerRadius: min(5, barWidth / 2), style: .continuous)
@@ -1944,10 +1950,9 @@ private struct MetricBarChart: View {
                                     maxHeight: geometry.size.height - 5
                                 )
                             )
-                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
                     }
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
             }
         }
         .accessibilityHidden(true)
@@ -1955,8 +1960,24 @@ private struct MetricBarChart: View {
 
     private func barWidth(in width: CGFloat, count: Int) -> CGFloat {
         guard count > 0 else { return 4 }
-        let slotWidth = width / CGFloat(count)
-        return min(12, max(4, slotWidth * 0.42))
+        let compactSpacing = CGFloat(max(count - 1, 0)) * preferredBarSpacing(for: count)
+        let availableWidth = width - compactSpacing
+        let preferredWidth = availableWidth / CGFloat(count)
+        guard preferredWidth >= 4 else {
+            return max(2, width / CGFloat(count * 2 - 1))
+        }
+        return min(12, preferredWidth)
+    }
+
+    private func barSpacing(in width: CGFloat, count: Int) -> CGFloat {
+        guard count > 1 else { return 0 }
+        let widthAfterBars = width - CGFloat(count) * barWidth(in: width, count: count)
+        let availableSpacing = widthAfterBars / CGFloat(count - 1)
+        return min(9, max(2, availableSpacing))
+    }
+
+    private func preferredBarSpacing(for count: Int) -> CGFloat {
+        count > 16 ? 5 : 7
     }
 
     private func barHeight(normalizedValue: Double, value: Double, maxHeight: CGFloat) -> CGFloat {
