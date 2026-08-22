@@ -8,12 +8,12 @@ struct TodayGoalsSection: View {
     @State private var isExpanded = true
 
     private let columns = [
-        GridItem(.flexible(), spacing: 14),
-        GridItem(.flexible(), spacing: 14)
+        GridItem(.flexible(), spacing: 12),
+        GridItem(.flexible(), spacing: 12)
     ]
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: 14) {
             DashboardSectionHeader(title: "Summary") {
                 Button {
                     withAnimation(sectionAnimation) {
@@ -28,7 +28,7 @@ struct TodayGoalsSection: View {
             }
 
             if isExpanded {
-                LazyVGrid(columns: columns, spacing: 14) {
+                LazyVGrid(columns: columns, spacing: 12) {
                     ForEach(goalCards) { card in
                         Button {
                             onMetricSelected(card.dataType)
@@ -189,13 +189,13 @@ struct RecentWorkoutSection: View {
     var onSelect: (() -> Void)? = nil
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: 14) {
             DashboardSectionHeader(title: "Recent Workout")
 
             Button {
                 onSelect?()
             } label: {
-                VStack(alignment: .leading, spacing: 16) {
+                VStack(alignment: .leading, spacing: 14) {
                     HStack(alignment: .center, spacing: 12) {
                         MetricBadge(systemImage: "dumbbell.fill", accentColor: .activeRing, size: 44)
 
@@ -218,13 +218,13 @@ struct RecentWorkoutSection: View {
                             .frame(width: 24, height: 24)
                     }
 
-                    HStack(alignment: .top, spacing: 14) {
+                    HStack(alignment: .top, spacing: 12) {
                         ForEach(workoutMetrics) { metric in
                             WorkoutMetricView(metric: metric)
                         }
                     }
                 }
-                .padding(16)
+                .padding(15)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(.summarySurface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
                 .accessibilityElement(children: .combine)
@@ -282,7 +282,7 @@ private struct DashboardSectionHeader<Trailing: View>: View {
     var body: some View {
         HStack(alignment: .center, spacing: 12) {
             Text(title)
-                .font(.system(size: 30, weight: .bold, design: .rounded))
+                .font(.system(size: 28, weight: .bold, design: .rounded))
                 .lineLimit(1)
                 .minimumScaleFactor(0.72)
 
@@ -320,9 +320,9 @@ private struct FitnessGoalCard: View {
     let card: FitnessGoalCardModel
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .top, spacing: 10) {
-                MetricBadge(systemImage: card.systemImage, accentColor: card.accentColor, size: 38)
+                MetricBadge(systemImage: card.systemImage, accentColor: card.accentColor, size: 36)
 
                 VStack(alignment: .leading, spacing: 3) {
                     Text(card.title)
@@ -349,9 +349,9 @@ private struct FitnessGoalCard: View {
                 }
             }
 
-            Spacer(minLength: 0)
+            Spacer(minLength: 4)
 
-            VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: 8) {
                 MetricValueText(value: card.value, unit: card.isAvailable ? card.unit : "")
 
                 if let progress = card.progress {
@@ -359,8 +359,8 @@ private struct FitnessGoalCard: View {
                 }
             }
         }
-        .padding(16)
-        .frame(maxWidth: .infinity, minHeight: 158, alignment: .topLeading)
+        .padding(14)
+        .frame(maxWidth: .infinity, minHeight: 144, alignment: .topLeading)
         .background(cardBackground, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: 8, style: .continuous)

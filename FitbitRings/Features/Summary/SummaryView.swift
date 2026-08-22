@@ -17,8 +17,10 @@ struct SummaryView: View {
                         showingSettings = true
                     }
                 )
+                .padding(.horizontal, 20)
+                .padding(.top, 18)
 
-                VStack(alignment: .leading, spacing: 30) {
+                VStack(alignment: .leading, spacing: 24) {
                     if let errorMessage = store.errorMessage {
                         SyncStatusBanner(errorMessage: errorMessage)
                     }
@@ -59,7 +61,7 @@ struct SummaryView: View {
                     )
                 }
                 .padding(.horizontal, 20)
-                .padding(.top, 26)
+                .padding(.top, 22)
                 .padding(.bottom, 38)
             }
         }
@@ -143,7 +145,7 @@ private struct ActivityTopBand: View {
     let onSettings: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 26) {
+        VStack(alignment: .leading, spacing: 18) {
             ActivityHeader(
                 syncState: snapshot.syncState,
                 lastUpdated: snapshot.lastUpdated,
@@ -155,14 +157,11 @@ private struct ActivityTopBand: View {
             ActivityHeroPanel(rings: snapshot.rings)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 20)
-        .padding(.top, 54)
-        .padding(.bottom, 30)
-        .background(Color.activityHeaderSurface)
-        .overlay(alignment: .bottom) {
-            Rectangle()
-                .fill(.dashboardStroke)
-                .frame(height: 1)
+        .padding(18)
+        .background(Color.activityHeaderSurface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .stroke(.dashboardStroke, lineWidth: 1)
         }
     }
 }
@@ -175,22 +174,15 @@ private struct ActivityHeader: View {
     let onSettings: () -> Void
 
     var body: some View {
-        HStack(alignment: .top, spacing: 14) {
-            VStack(alignment: .leading, spacing: 5) {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .center, spacing: 14) {
                 Text("Summary")
-                    .font(.system(size: 38, weight: .bold, design: .rounded))
+                    .font(.system(size: 36, weight: .bold, design: .rounded))
                     .lineLimit(1)
                     .minimumScaleFactor(0.75)
 
-                Text(headerSubtitle)
-                    .font(.title3.weight(.bold))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(2)
-                    .minimumScaleFactor(0.78)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
+                Spacer(minLength: 10)
 
-            VStack(alignment: .trailing, spacing: 10) {
                 Button(action: onSettings) {
                     Image(systemName: "gearshape.fill")
                         .font(.system(size: 16, weight: .bold))
@@ -204,11 +196,31 @@ private struct ActivityHeader: View {
                 .buttonStyle(.plain)
                 .foregroundStyle(.primary)
                 .accessibilityLabel("Settings")
+            }
 
-                SyncPill(syncState: syncState, lastUpdated: lastUpdated)
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .center, spacing: 10) {
+                    subtitleText
+                    Spacer(minLength: 8)
+                    SyncPill(syncState: syncState, lastUpdated: lastUpdated)
+                }
+
+                VStack(alignment: .leading, spacing: 8) {
+                    subtitleText
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    SyncPill(syncState: syncState, lastUpdated: lastUpdated)
+                }
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var subtitleText: some View {
+        Text(headerSubtitle)
+            .font(.headline.weight(.bold))
+            .foregroundStyle(.secondary)
+            .lineLimit(2)
+            .minimumScaleFactor(0.78)
     }
 
     private var headerSubtitle: String {
@@ -225,9 +237,9 @@ private struct ActivityHeroPanel: View {
 
     var body: some View {
         ViewThatFits(in: .horizontal) {
-            HStack(alignment: .center, spacing: 14) {
+            HStack(alignment: .center, spacing: 12) {
                 ActivityRingStats(rings: rings)
-                    .frame(width: 116, alignment: .leading)
+                    .frame(width: 124, alignment: .leading)
 
                 Spacer(minLength: 0)
 
@@ -236,16 +248,16 @@ private struct ActivityHeroPanel: View {
                     showsCenterSummary: false,
                     showsRingBadges: true
                 )
-                .frame(width: 208)
+                .frame(width: 176)
             }
 
-            VStack(alignment: .leading, spacing: 20) {
+            VStack(alignment: .leading, spacing: 16) {
                 ActivityRingsView(
                     rings: rings,
                     showsCenterSummary: false,
                     showsRingBadges: true
                 )
-                .frame(maxWidth: 250)
+                .frame(maxWidth: 204)
                 .frame(maxWidth: .infinity)
 
                 ActivityRingStats(rings: rings)
@@ -259,19 +271,12 @@ private struct ActivityRingStats: View {
     let rings: RingSet
 
     var body: some View {
-        ViewThatFits(in: .horizontal) {
-            VStack(alignment: .leading, spacing: 22) {
-                heroMetric(title: "Move", metric: rings.move, unit: "kcal", color: .moveRing)
-                heroMetric(title: "Exercise", metric: rings.active, unit: "min", color: .activeRing)
-                heroMetric(title: "Steps", metric: rings.steps, unit: "steps", color: .stepsRing)
-            }
-
-            HStack(alignment: .top, spacing: 22) {
-                heroMetric(title: "Move", metric: rings.move, unit: "kcal", color: .moveRing)
-                heroMetric(title: "Exercise", metric: rings.active, unit: "min", color: .activeRing)
-                heroMetric(title: "Steps", metric: rings.steps, unit: "steps", color: .stepsRing)
-            }
+        VStack(alignment: .leading, spacing: 10) {
+            heroMetric(title: "Move", metric: rings.move, unit: "kcal", color: .moveRing)
+            heroMetric(title: "Exercise", metric: rings.active, unit: "min", color: .activeRing)
+            heroMetric(title: "Steps", metric: rings.steps, unit: "steps", color: .stepsRing)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func heroMetric(
@@ -280,26 +285,38 @@ private struct ActivityRingStats: View {
         unit: String,
         color: Color
     ) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(title)
-                .font(.title3.weight(.bold))
-                .foregroundStyle(color)
-                .lineLimit(1)
-                .minimumScaleFactor(0.72)
+        HStack(alignment: .center, spacing: 8) {
+            RoundedRectangle(cornerRadius: 3, style: .continuous)
+                .fill(color)
+                .frame(width: 4, height: 34)
 
-            Text(DashboardFormatting.integer(metric.value))
-                .font(.system(size: 30, weight: .bold, design: .rounded))
-                .monospacedDigit()
-                .foregroundStyle(.primary)
-                .lineLimit(1)
-                .minimumScaleFactor(0.45)
-                .allowsTightening(true)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(title)
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(color)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.72)
 
-            Text(unit)
-                .font(.headline.weight(.semibold))
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-                .minimumScaleFactor(0.7)
+                HStack(alignment: .lastTextBaseline, spacing: 3) {
+                    Text(DashboardFormatting.integer(metric.value))
+                        .font(.system(size: 24, weight: .bold, design: .rounded))
+                        .monospacedDigit()
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.48)
+                        .allowsTightening(true)
+
+                    Text(unit)
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.65)
+                        .allowsTightening(true)
+                }
+            }
+            .layoutPriority(1)
+
+            Spacer(minLength: 0)
         }
         .accessibilityElement(children: .combine)
     }

@@ -5,23 +5,24 @@ struct ActivityRingsView: View {
     var showsCenterSummary = true
     var showsRingBadges = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    private let lineWidth: CGFloat = 22
 
     var body: some View {
         GeometryReader { geometry in
             let size = min(geometry.size.width, geometry.size.height)
+            let lineWidth = ringLineWidth(for: size)
+            let ringSpacing = lineWidth * 1.55
 
             ZStack {
-                ring(metric: rings.move, color: .moveRing, inset: 0)
-                ring(metric: rings.active, color: .activeRing, inset: 34)
-                ring(metric: rings.steps, color: .stepsRing, inset: 68)
+                ring(metric: rings.move, color: .moveRing, inset: 0, lineWidth: lineWidth)
+                ring(metric: rings.active, color: .activeRing, inset: ringSpacing, lineWidth: lineWidth)
+                ring(metric: rings.steps, color: .stepsRing, inset: ringSpacing * 2, lineWidth: lineWidth)
 
                 if showsCenterSummary {
                     centerSummary
                 }
 
                 if showsRingBadges {
-                    ringBadges(size: size)
+                    ringBadges(size: size, lineWidth: lineWidth, ringSpacing: ringSpacing)
                 }
             }
             .frame(width: size, height: size)
@@ -60,10 +61,10 @@ struct ActivityRingsView: View {
         .padding(.horizontal, 28)
     }
 
-    private func ring(metric: RingMetric, color: Color, inset: CGFloat) -> some View {
+    private func ring(metric: RingMetric, color: Color, inset: CGFloat, lineWidth: CGFloat) -> some View {
         ZStack {
             RingShape(progress: 1)
-                .stroke(color.opacity(0.14), style: stroke)
+                .stroke(color.opacity(0.14), style: stroke(lineWidth: lineWidth))
             RingShape(progress: metric.cappedProgress)
                 .stroke(
                     AngularGradient(
@@ -72,7 +73,7 @@ struct ActivityRingsView: View {
                         startAngle: .degrees(-90),
                         endAngle: .degrees(270)
                     ),
-                    style: stroke
+                    style: stroke(lineWidth: lineWidth)
                 )
                 .shadow(color: color.opacity(0.20), radius: 7, x: 0, y: 3)
         }
@@ -81,27 +82,31 @@ struct ActivityRingsView: View {
         .animation(progressAnimation, value: metric.cappedProgress)
     }
 
-    private func ringBadges(size: CGFloat) -> some View {
+    private func ringBadges(size: CGFloat, lineWidth: CGFloat, ringSpacing: CGFloat) -> some View {
         ZStack {
-            ringBadge(systemImage: "arrow.right", color: .moveRing)
+            ringBadge(systemImage: "arrow.right", color: .moveRing, lineWidth: lineWidth)
                 .position(x: size / 2, y: lineWidth / 2)
-            ringBadge(systemImage: "chevron.right.2", color: .activeRing)
-                .position(x: size / 2, y: 34 + lineWidth / 2)
-            ringBadge(systemImage: "arrow.up", color: .stepsRing)
-                .position(x: size / 2, y: 68 + lineWidth / 2)
+            ringBadge(systemImage: "chevron.right.2", color: .activeRing, lineWidth: lineWidth)
+                .position(x: size / 2, y: ringSpacing + lineWidth / 2)
+            ringBadge(systemImage: "arrow.up", color: .stepsRing, lineWidth: lineWidth)
+                .position(x: size / 2, y: ringSpacing * 2 + lineWidth / 2)
         }
         .frame(width: size, height: size)
     }
 
-    private func ringBadge(systemImage: String, color: Color) -> some View {
+    private func ringBadge(systemImage: String, color: Color, lineWidth: CGFloat) -> some View {
         Image(systemName: systemImage)
-            .font(.system(size: 15, weight: .heavy, design: .rounded))
+            .font(.system(size: lineWidth * 0.68, weight: .heavy, design: .rounded))
             .foregroundStyle(Color.black.opacity(0.82))
             .frame(width: lineWidth * 1.35, height: lineWidth * 1.35)
             .background(color, in: Circle())
     }
 
-    private var stroke: StrokeStyle {
+    private func ringLineWidth(for size: CGFloat) -> CGFloat {
+        min(22, max(16, size * 0.105))
+    }
+
+    private func stroke(lineWidth: CGFloat) -> StrokeStyle {
         StrokeStyle(lineWidth: lineWidth, lineCap: .round, lineJoin: .round)
     }
 

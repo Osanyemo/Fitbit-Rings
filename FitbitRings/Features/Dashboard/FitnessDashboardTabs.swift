@@ -74,12 +74,12 @@ struct SummaryHourlyPairSection: View {
     let onSelectMetric: (GoogleHealthDataType) -> Void
 
     private let columns = [
-        GridItem(.flexible(), spacing: 14),
-        GridItem(.flexible(), spacing: 14)
+        GridItem(.flexible(), spacing: 12),
+        GridItem(.flexible(), spacing: 12)
     ]
 
     var body: some View {
-        LazyVGrid(columns: columns, spacing: 14) {
+        LazyVGrid(columns: columns, spacing: 12) {
             DashboardMetricCard(
                 title: "Steps",
                 value: stepsValue,
@@ -88,7 +88,6 @@ struct SummaryHourlyPairSection: View {
                 systemImage: GoogleHealthDataType.steps.symbolName,
                 accentColor: .stepsRing,
                 points: hourlySeries(for: .steps)?.points ?? [],
-                reservesChartSpace: true,
                 isAvailable: snapshot.summary.activity.hasData(for: .steps)
             ) {
                 onSelectMetric(.steps)
@@ -102,7 +101,6 @@ struct SummaryHourlyPairSection: View {
                 systemImage: GoogleHealthDataType.distance.symbolName,
                 accentColor: .distanceAccent,
                 points: hourlySeries(for: .distance)?.points ?? [],
-                reservesChartSpace: true,
                 isAvailable: snapshot.summary.activity.hasData(for: .distance)
             ) {
                 onSelectMetric(.distance)
@@ -229,10 +227,17 @@ private struct HealthTabView: View {
                 await store.refreshSection(.health)
             }
         ) {
-            VStack(alignment: .leading, spacing: 24) {
+            VStack(alignment: .leading, spacing: 22) {
                 if store.snapshot.health.isEmpty {
                     DashboardEmptyState(title: "No health data", systemImage: "heart.text.square")
                 } else {
+                    HealthOverviewSection(
+                        health: store.snapshot.health,
+                        units: store.preferences.units,
+                        onSelectMetric: { store.route(to: .metric($0)) },
+                        onSelectSleep: { store.route(to: .sleep($0)) }
+                    )
+
                     HealthMetricGroup(
                         title: "Heart",
                         series: store.snapshot.health.heartSeries,
@@ -280,6 +285,213 @@ private struct HealthTabView: View {
         .task {
             await store.loadIfNeeded(.health)
         }
+    }
+}
+
+private struct HealthOverviewSection: View {
+    let health: HealthDashboardData
+    let units: UnitPreferences
+    let onSelectMetric: (GoogleHealthDataType) -> Void
+    let onSelectSleep: (String) -> Void
+
+    private let columns = [
+        GridItem(.flexible(), spacing: 12),
+        GridItem(.flexible(), spacing: 12)
+    ]
+
+    @ViewBuilder
+    var body: some View {
+        let items = overviewItems
+        if !items.isEmpty {
+            VStack(alignment: .leading, spacing: 14) {
+                Text("Overview")
+                    .font(.title2.weight(.bold))
+
+                if items.count == 1, let item = items.first {
+                    Button {
+                        select(item)
+                    } label: {
+                        HealthOverviewCard(item: item)
+                    }
+                    .buttonStyle(.plain)
+                } else {
+                    LazyVGrid(columns: columns, spacing: 12) {
+                        ForEach(items) { item in
+                            Button {
+                                select(item)
+                            } label: {
+                                HealthOverviewCard(item: item)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private var overviewItems: [HealthOverviewItem] {
+        [heartItem, sleepItem].compactMap { $0 }
+    }
+
+    private var heartItem: HealthOverviewItem? {
+        let preferredTypes: [GoogleHealthDataType] = [
+            .heartRate,
+            .dailyRestingHeartRate,
+            .heartRateVariability,
+            .dailyHeartRateVariability
+        ]
+        let preferredSeries = preferredTypes
+            .compactMap { health.series(for: $0) }
+            .first { !$0.points.isEmpty }
+        guard let series = preferredSeries ?? health.heartSeries.first(where: { !$0.points.isEmpty }),
+              let latest = series.latestPoint else {
+            return nil
+        }
+
+        let value = DashboardFormatting.metricValue(latest.value, type: series.type, units: units)
+        return HealthOverviewItem(
+            title: series.type.displayName,
+            value: value.value,
+            unit: value.unit,
+            subtitle: "Measured \(DashboardFormatting.time(latest.startDate))",
+            systemImage: series.type.symbolName,
+            accentColor: series.type.accentColor,
+            destination: .metric(series.type)
+        )
+    }
+
+    private var sleepItem: HealthOverviewItem? {
+        guard let session = latestSleepSession else { return nil }
+
+        let duration = DashboardFormatting.durationParts(session.summaryValue.durationSeconds)
+        return HealthOverviewItem(
+            title: "Sleep",
+            value: duration.value,
+            unit: duration.unit,
+            subtitle: sleepRange(for: session),
+            systemImage: "moon.zzz.fill",
+            accentColor: .sleepAccent,
+            destination: .sleep(session.id)
+        )
+    }
+
+    private var latestSleepSession: SleepSession? {
+        health.sleepSessions.max { sleepSortDate($0) < sleepSortDate($1) }
+    }
+
+    private func sleepSortDate(_ session: SleepSession) -> Date {
+        session.endTime ?? session.startTime ?? .distantPast
+    }
+
+    private func sleepRange(for session: SleepSession) -> String {
+        guard session.startTime != nil || session.endTime != nil else {
+            return "Last sleep"
+        }
+        return "\(DashboardFormatting.time(session.startTime)) - \(DashboardFormatting.time(session.endTime))"
+    }
+
+    private func select(_ item: HealthOverviewItem) {
+        switch item.destination {
+        case .metric(let type):
+            onSelectMetric(type)
+        case .sleep(let id):
+            onSelectSleep(id)
+        }
+    }
+}
+
+private struct HealthOverviewItem: Identifiable {
+    var id: String { destination.id }
+    let title: String
+    let value: String
+    let unit: String
+    let subtitle: String
+    let systemImage: String
+    let accentColor: Color
+    let destination: HealthOverviewDestination
+}
+
+private enum HealthOverviewDestination {
+    case metric(GoogleHealthDataType)
+    case sleep(String)
+
+    var id: String {
+        switch self {
+        case .metric(let type):
+            return type.rawValue
+        case .sleep(let id):
+            return "sleep-\(id)"
+        }
+    }
+}
+
+private struct HealthOverviewCard: View {
+    let item: HealthOverviewItem
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .top, spacing: 10) {
+                Image(systemName: item.systemImage)
+                    .font(.headline.weight(.bold))
+                    .symbolRenderingMode(.hierarchical)
+                    .foregroundStyle(item.accentColor)
+                    .frame(width: 38, height: 38)
+                    .background(item.accentColor.opacity(0.16), in: Circle())
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(item.title)
+                        .font(.subheadline.weight(.bold))
+                        .foregroundStyle(.primary)
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.72)
+
+                    Text(item.subtitle)
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.76)
+                }
+                .layoutPriority(1)
+
+                Spacer(minLength: 0)
+
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(.tertiary)
+            }
+
+            Spacer(minLength: 0)
+
+            HStack(alignment: .lastTextBaseline, spacing: 4) {
+                Text(item.value)
+                    .font(.system(size: 32, weight: .bold, design: .rounded))
+                    .monospacedDigit()
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.48)
+                    .allowsTightening(true)
+
+                if !item.unit.isEmpty {
+                    Text(item.unit)
+                        .font(.headline.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.62)
+                }
+            }
+        }
+        .padding(15)
+        .frame(maxWidth: .infinity, minHeight: 136, alignment: .topLeading)
+        .background(overviewBackground, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .stroke(item.accentColor.opacity(0.18), lineWidth: 1)
+        }
+        .accessibilityElement(children: .combine)
+    }
+
+    private var overviewBackground: Color {
+        item.accentColor.opacity(0.12)
     }
 }
 
@@ -835,13 +1047,13 @@ struct DashboardMetricCard: View {
     }
 
     private var cardContent: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .top, spacing: 10) {
                 Image(systemName: systemImage)
                     .font(.headline.weight(.bold))
                     .symbolRenderingMode(.hierarchical)
                     .foregroundStyle(accentColor)
-                    .frame(width: 36, height: 36)
+                    .frame(width: 34, height: 34)
                     .background(accentColor.opacity(0.15), in: Circle())
 
                 VStack(alignment: .leading, spacing: 3) {
@@ -887,17 +1099,17 @@ struct DashboardMetricCard: View {
                 }
             }
 
-            if !points.isEmpty {
+            if showsChart {
                 MetricBarChart(points: points, color: accentColor)
-                    .frame(height: 44)
-            } else if reservesChartSpace {
+                    .frame(height: 38)
+            } else if reservesChartSpace && points.isEmpty {
                 Color.clear
-                    .frame(height: 44)
+                    .frame(height: 38)
                     .accessibilityHidden(true)
             }
         }
-        .padding(16)
-        .frame(maxWidth: .infinity, minHeight: showsChartSlot ? 184 : 134, alignment: .topLeading)
+        .padding(14)
+        .frame(maxWidth: .infinity, minHeight: showsChartSlot ? 168 : 122, alignment: .topLeading)
         .background(.summarySurface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: 8, style: .continuous)
@@ -906,7 +1118,11 @@ struct DashboardMetricCard: View {
     }
 
     private var showsChartSlot: Bool {
-        !points.isEmpty || reservesChartSpace
+        showsChart || (reservesChartSpace && points.isEmpty)
+    }
+
+    private var showsChart: Bool {
+        points.count > 1
     }
 }
 
@@ -965,13 +1181,89 @@ private struct HealthMetricGroup: View {
     var body: some View {
         let visibleSeries = series.filter { !$0.points.isEmpty }
         if !visibleSeries.isEmpty {
-            DashboardSeriesSection(
+            HealthSeriesSection(
                 title: title,
                 series: visibleSeries,
                 units: units,
                 onSelectMetric: onSelectMetric
             )
         }
+    }
+}
+
+private struct HealthSeriesSection: View {
+    let title: String
+    let series: [NumericMetricSeries]
+    let units: UnitPreferences
+    let onSelectMetric: (GoogleHealthDataType) -> Void
+
+    private let columns = [
+        GridItem(.flexible(), spacing: 12),
+        GridItem(.flexible(), spacing: 12)
+    ]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text(title)
+                .font(.title2.weight(.bold))
+
+            if series.count == 1 {
+                ForEach(series) { item in
+                    HealthSeriesCard(series: item, units: units, onSelectMetric: onSelectMetric)
+                }
+            } else {
+                LazyVGrid(columns: columns, spacing: 12) {
+                    ForEach(series) { item in
+                        HealthSeriesCard(series: item, units: units, onSelectMetric: onSelectMetric)
+                    }
+                }
+            }
+        }
+    }
+}
+
+private struct HealthSeriesCard: View {
+    let series: NumericMetricSeries
+    let units: UnitPreferences
+    let onSelectMetric: (GoogleHealthDataType) -> Void
+
+    var body: some View {
+        DashboardMetricCard(
+            title: series.title,
+            value: latestValue.value,
+            unit: latestValue.unit,
+            subtitle: subtitle,
+            systemImage: series.type.symbolName,
+            accentColor: series.type.accentColor,
+            points: chartPoints,
+            reservesChartSpace: chartPoints.count > 1,
+            isAvailable: series.latestPoint != nil
+        ) {
+            onSelectMetric(series.type)
+        }
+    }
+
+    private var latestValue: DashboardFormatting.MetricValue {
+        guard let latest = series.latestPoint else {
+            return DashboardFormatting.MetricValue(value: "No data", unit: "")
+        }
+        return DashboardFormatting.metricValue(latest.value, type: series.type, units: units)
+    }
+
+    private var subtitle: String {
+        guard let latest = series.latestPoint else {
+            return series.rangeSubtitle
+        }
+
+        if series.points.count <= 1 {
+            return "Measured \(latest.startDate.formatted(date: .abbreviated, time: .shortened))"
+        }
+
+        return series.rangeSubtitle
+    }
+
+    private var chartPoints: [NumericMetricPoint] {
+        series.points.count > 1 ? series.points : []
     }
 }
 
@@ -1100,20 +1392,153 @@ private struct SleepSessionsSection: View {
                 DashboardEmptyState(title: "No sleep data", systemImage: "moon.zzz")
             } else {
                 ForEach(sessions) { session in
-                    DashboardMetricCard(
-                        title: "Sleep",
-                        value: DashboardFormatting.durationParts(session.summaryValue.durationSeconds).value,
-                        unit: DashboardFormatting.durationParts(session.summaryValue.durationSeconds).unit,
-                        subtitle: "\(DashboardFormatting.time(session.startTime)) - \(DashboardFormatting.time(session.endTime))",
-                        systemImage: "moon.zzz.fill",
-                        accentColor: .sleepAccent,
-                        isAvailable: true
-                    ) {
+                    Button {
                         onSelect(session)
+                    } label: {
+                        HealthSleepSessionCard(session: session)
                     }
+                    .buttonStyle(.plain)
                 }
             }
         }
+    }
+}
+
+private struct HealthSleepSessionCard: View {
+    let session: SleepSession
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .top, spacing: 12) {
+                Image(systemName: "moon.zzz.fill")
+                    .font(.headline.weight(.bold))
+                    .symbolRenderingMode(.hierarchical)
+                    .foregroundStyle(.sleepAccent)
+                    .frame(width: 38, height: 38)
+                    .background(Color.sleepAccent.opacity(0.16), in: Circle())
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Sleep")
+                        .font(.headline.weight(.bold))
+                        .lineLimit(1)
+
+                    Text(sleepRange)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.74)
+                }
+                .layoutPriority(1)
+
+                Spacer(minLength: 0)
+
+                Image(systemName: "chevron.right")
+                    .font(.headline.weight(.bold))
+                    .foregroundStyle(.tertiary)
+            }
+
+            HStack(alignment: .lastTextBaseline, spacing: 4) {
+                Text(duration.value)
+                    .font(.system(size: 34, weight: .bold, design: .rounded))
+                    .monospacedDigit()
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.54)
+                    .allowsTightening(true)
+
+                if !duration.unit.isEmpty {
+                    Text(duration.unit)
+                        .font(.headline.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            if !session.stages.isEmpty {
+                SleepStageStrip(stages: session.stages)
+            }
+        }
+        .padding(15)
+        .frame(maxWidth: .infinity, alignment: .topLeading)
+        .background(.summarySurface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .stroke(.dashboardStroke, lineWidth: 1)
+        }
+        .accessibilityElement(children: .combine)
+    }
+
+    private var duration: DashboardFormatting.MetricValue {
+        DashboardFormatting.durationParts(session.summaryValue.durationSeconds)
+    }
+
+    private var sleepRange: String {
+        guard session.startTime != nil || session.endTime != nil else {
+            return "Sleep session"
+        }
+        return "\(DashboardFormatting.time(session.startTime)) - \(DashboardFormatting.time(session.endTime))"
+    }
+}
+
+private struct SleepStageStrip: View {
+    let stages: [SleepStageSummary]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 9) {
+            GeometryReader { geometry in
+                HStack(spacing: 3) {
+                    ForEach(stages) { stage in
+                        Capsule()
+                            .fill(color(for: stage.stage).opacity(0.9))
+                            .frame(width: segmentWidth(for: stage, totalWidth: geometry.size.width))
+                    }
+                }
+            }
+            .frame(height: 8)
+
+            HStack(spacing: 10) {
+                ForEach(stages.prefix(3)) { stage in
+                    HStack(spacing: 5) {
+                        Circle()
+                            .fill(color(for: stage.stage))
+                            .frame(width: 6, height: 6)
+
+                        Text(stage.stage)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.72)
+                    }
+                }
+            }
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(.secondary)
+        }
+        .accessibilityLabel(stageAccessibilityText)
+    }
+
+    private var totalDuration: TimeInterval {
+        max(stages.reduce(0) { $0 + $1.durationSeconds }, 1)
+    }
+
+    private func segmentWidth(for stage: SleepStageSummary, totalWidth: CGFloat) -> CGFloat {
+        max(6, totalWidth * CGFloat(stage.durationSeconds / totalDuration))
+    }
+
+    private func color(for stage: String) -> Color {
+        let normalizedStage = stage.lowercased()
+        if normalizedStage.contains("deep") {
+            return Color(uiColor: .systemIndigo)
+        }
+        if normalizedStage.contains("rem") {
+            return Color(uiColor: .systemPurple)
+        }
+        if normalizedStage.contains("awake") || normalizedStage.contains("wake") {
+            return Color(uiColor: .systemTeal)
+        }
+        return .sleepAccent
+    }
+
+    private var stageAccessibilityText: String {
+        stages
+            .map { "\($0.stage) \(DashboardFormatting.duration($0.durationSeconds))" }
+            .joined(separator: ", ")
     }
 }
 
