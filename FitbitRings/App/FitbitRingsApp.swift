@@ -27,6 +27,7 @@ struct FitbitRingsApp: App {
 
         return try ModelContainer(
             for: CachedDashboardSnapshot.self,
+            CachedDashboardSection.self,
             CachedPreferences.self,
             configurations: configuration
         )

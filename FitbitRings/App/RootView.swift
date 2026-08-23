@@ -9,6 +9,7 @@ struct RootView: View {
     @Environment(\.scenePhase) private var scenePhase
     @State private var store: FitnessDashboardStore?
     @State private var isSignedIn = false
+    @State private var didScheduleInitialLoad = false
 
     private let authenticator = GoogleSignInAuthenticator()
 
@@ -22,6 +23,7 @@ struct RootView: View {
                         store.clearHealthDataForDisconnect()
                         authenticator.signOut()
                         isSignedIn = false
+                        didScheduleInitialLoad = false
                         self.store = nil
                     }
                 )
@@ -64,7 +66,15 @@ struct RootView: View {
             )
         }
 
-        await store?.load()
+        guard let store, !didScheduleInitialLoad else { return }
+        didScheduleInitialLoad = true
+
+        Task { @MainActor in
+            await Task.yield()
+            await store.load()
+            await Task.yield()
+            await store.refreshSummaryIfStale()
+        }
     }
 }
 

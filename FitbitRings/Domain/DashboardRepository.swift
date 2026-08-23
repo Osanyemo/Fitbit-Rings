@@ -100,7 +100,7 @@ struct DashboardRepository {
         var snapshot = cachedSnapshot
         snapshot.activity = try await googleHealthClient.fetchActivityData(date: date)
         snapshot.lastUpdated = .now
-        cache.saveFitnessData(snapshot)
+        cache.saveActivityData(snapshot.activity)
         return snapshot
     }
 
@@ -113,7 +113,7 @@ struct DashboardRepository {
         snapshot.workouts = try await googleHealthClient.fetchWorkoutData(date: date)
         snapshot.workoutsLoadedAt = loadedAt
         snapshot.lastUpdated = loadedAt
-        cache.saveFitnessData(snapshot)
+        cache.saveWorkouts(snapshot.workouts, loadedAt: loadedAt)
         return snapshot
     }
 
@@ -124,7 +124,7 @@ struct DashboardRepository {
         var snapshot = cachedSnapshot
         snapshot.health = try await googleHealthClient.fetchHealthData(date: date)
         snapshot.lastUpdated = .now
-        cache.saveFitnessData(snapshot)
+        cache.saveHealthData(snapshot.health)
         return snapshot
     }
 
@@ -146,7 +146,14 @@ struct DashboardRepository {
         }
 
         snapshot.lastUpdated = .now
-        cache.saveFitnessData(snapshot)
+        switch type.category {
+        case .activity:
+            cache.saveActivityData(snapshot.activity)
+        case .heart, .sleep, .vitals, .cardioFitness, .body:
+            cache.saveHealthData(snapshot.health)
+        case .workout:
+            break
+        }
         return snapshot
     }
 

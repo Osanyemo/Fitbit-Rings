@@ -15,6 +15,19 @@ final class CachedDashboardSnapshot {
 }
 
 @Model
+final class CachedDashboardSection {
+    @Attribute(.unique) var id: String
+    var data: Data
+    var updatedAt: Date
+
+    init(id: String, data: Data, updatedAt: Date) {
+        self.id = id
+        self.data = data
+        self.updatedAt = updatedAt
+    }
+}
+
+@Model
 final class CachedPreferences {
     @Attribute(.unique) var id: String
     var moveCalories: Int

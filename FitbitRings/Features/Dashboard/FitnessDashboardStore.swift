@@ -19,9 +19,10 @@ final class FitnessDashboardStore {
     var healthPath: [DashboardRoute] = []
     var errorMessage: String?
 
-    init(repository: DashboardRepository, cache: DashboardCaching, staleAfter: TimeInterval = 60) {
+    init(repository: DashboardRepository, cache: DashboardCaching, staleAfter: TimeInterval = 300) {
         let cachedPreferences = cache.loadPreferences()
-        let cachedSnapshot = cache.loadFitnessData()
+        let cachedSummary = cache.loadSummary()
+        let cachedSnapshot = cachedSummary.map(FitnessDataSnapshot.fromLegacyDashboard)
 
         self.repository = repository
         self.cache = cache
@@ -34,14 +35,16 @@ final class FitnessDashboardStore {
 
     func load() async {
         preferences = cache.loadPreferences()
-        if let cached = cache.loadFitnessData() {
-            snapshot = cached
-            sectionStates = Self.initialSectionStates(for: cached)
+        if let summary = cache.loadSummary() {
+            snapshot.summary = summary
+            snapshot.lastUpdated = max(snapshot.lastUpdated, summary.lastUpdated)
+            setSection(.summary, phase: .loaded, lastUpdated: summary.lastUpdated, error: nil)
         } else if snapshot.summary.lastUpdated == .distantPast {
             snapshot = .empty(goals: preferences.goals)
             sectionStates = Self.initialSectionStates(for: nil)
         }
-        await refreshSummaryIfStale()
+
+        hydrateCachedSections()
     }
 
     func refreshSummaryIfStale(now: Date = .now) async {
@@ -52,6 +55,10 @@ final class FitnessDashboardStore {
     }
 
     func loadSelectedTabIfNeeded() async {
+        guard selectedTab.section != .summary else {
+            return
+        }
+
         await loadIfNeeded(selectedTab.section)
     }
 
@@ -237,6 +244,39 @@ final class FitnessDashboardStore {
 
     private func finishRefresh(_ section: FitnessDashboardSection) {
         activeRefreshes.remove(section)
+    }
+
+    private func hydrateCachedSections() {
+        if let activity = cache.loadActivityData() {
+            snapshot.activity = activity
+            if let loadedAt = activity.loadedAt {
+                setSection(.activity, phase: .loaded, lastUpdated: loadedAt, error: nil)
+            }
+        }
+
+        if let workouts = cache.loadWorkouts() {
+            snapshot.workouts = workouts.workouts
+            snapshot.workoutsLoadedAt = workouts.loadedAt
+            if let loadedAt = workouts.loadedAt {
+                setSection(.workouts, phase: .loaded, lastUpdated: loadedAt, error: nil)
+            }
+        }
+
+        if let health = cache.loadHealthData() {
+            snapshot.health = health
+            if let loadedAt = health.loadedAt {
+                setSection(.health, phase: .loaded, lastUpdated: loadedAt, error: nil)
+            }
+        }
+
+        snapshot.lastUpdated = [
+            snapshot.summary.lastUpdated,
+            snapshot.activity.loadedAt,
+            snapshot.workoutsLoadedAt,
+            snapshot.health.loadedAt
+        ]
+        .compactMap { $0 }
+        .max() ?? snapshot.summary.lastUpdated
     }
 
     private func setSection(

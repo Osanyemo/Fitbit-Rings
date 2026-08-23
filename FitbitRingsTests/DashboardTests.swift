@@ -1,3 +1,4 @@
+import SwiftData
 import SwiftUI
 import XCTest
 @testable import FitbitRings
@@ -309,6 +310,77 @@ final class DashboardTests: XCTestCase {
     }
 
     @MainActor
+    func testFitnessDashboardStoreLoadHydratesCachedSectionsWithoutNetwork() async {
+        let summary = dashboardSnapshot(steps: 1_234, lastUpdated: Date(timeIntervalSince1970: 1_000))
+        let activity = cachedActivityData(loadedAt: Date(timeIntervalSince1970: 1_100))
+        let workoutLoadedAt = Date(timeIntervalSince1970: 1_200)
+        let workout = workoutDetail(startTime: Date(timeIntervalSince1970: 900))
+        let health = cachedHealthData(loadedAt: Date(timeIntervalSince1970: 1_300))
+        let cache = InMemoryDashboardCache()
+        cache.fitnessSnapshot = FitnessDataSnapshot(
+            summary: summary,
+            activity: activity,
+            workouts: [workout],
+            workoutsLoadedAt: workoutLoadedAt,
+            health: health,
+            lastUpdated: health.loadedAt
+        )
+        let fresh = dashboardSnapshot(steps: 5_678, lastUpdated: Date(timeIntervalSince1970: 2_000))
+        let client = StubGoogleHealthClient(response: .success(fresh))
+        let repository = DashboardRepository(googleHealthClient: client, cache: cache)
+        let store = FitnessDashboardStore(repository: repository, cache: cache, staleAfter: 0)
+
+        await store.load()
+
+        let fetchCount = await client.numberOfFetches()
+        XCTAssertEqual(fetchCount, 0)
+        XCTAssertEqual(store.snapshot.summary, summary)
+        XCTAssertEqual(store.snapshot.activity, activity)
+        XCTAssertEqual(store.snapshot.workouts, [workout])
+        XCTAssertEqual(store.snapshot.workoutsLoadedAt, workoutLoadedAt)
+        XCTAssertEqual(store.snapshot.health, health)
+        XCTAssertEqual(store.sectionState(.activity).phase, .loaded)
+        XCTAssertEqual(store.sectionState(.workouts).phase, .loaded)
+        XCTAssertEqual(store.sectionState(.health).phase, .loaded)
+    }
+
+    @MainActor
+    func testFitnessDashboardStoreDefaultFreshnessWindowIsFiveMinutes() async {
+        let now = Date(timeIntervalSince1970: 1_000)
+        let cached = dashboardSnapshot(steps: 1_234, lastUpdated: now.addingTimeInterval(-299))
+        let fresh = dashboardSnapshot(steps: 5_678, lastUpdated: now)
+        let cache = InMemoryDashboardCache()
+        cache.fitnessSnapshot = FitnessDataSnapshot.fromLegacyDashboard(cached)
+        let client = StubGoogleHealthClient(response: .success(fresh))
+        let repository = DashboardRepository(googleHealthClient: client, cache: cache)
+        let store = FitnessDashboardStore(repository: repository, cache: cache)
+
+        await store.refreshSummaryIfStale(now: now)
+
+        let fetchCount = await client.numberOfFetches()
+        XCTAssertEqual(fetchCount, 0)
+        XCTAssertEqual(store.snapshot.summary, cached)
+    }
+
+    @MainActor
+    func testFitnessDashboardStoreManualRefreshBypassesFreshnessWindow() async {
+        let now = Date(timeIntervalSince1970: 1_000)
+        let cached = dashboardSnapshot(steps: 1_234, lastUpdated: now.addingTimeInterval(-5))
+        let fresh = dashboardSnapshot(steps: 5_678, lastUpdated: now)
+        let cache = InMemoryDashboardCache()
+        cache.fitnessSnapshot = FitnessDataSnapshot.fromLegacyDashboard(cached)
+        let client = StubGoogleHealthClient(response: .success(fresh))
+        let repository = DashboardRepository(googleHealthClient: client, cache: cache)
+        let store = FitnessDashboardStore(repository: repository, cache: cache)
+
+        await store.refreshSummary()
+
+        let fetchCount = await client.numberOfFetches()
+        XCTAssertEqual(fetchCount, 1)
+        XCTAssertEqual(store.snapshot.summary, fresh)
+    }
+
+    @MainActor
     func testFitnessDashboardStoreFetchesWorkoutsWhenCacheOnlyHasSummaryWorkout() async {
         var summary = dashboardSnapshot(steps: 1_234, lastUpdated: Date(timeIntervalSince1970: 1_000))
         summary.latestWorkout = WorkoutSummary(
@@ -398,6 +470,84 @@ final class DashboardTests: XCTestCase {
         XCTAssertNil(cache.snapshot)
         XCTAssertEqual(cache.preferences, .defaults)
         XCTAssertEqual(store.snapshot.summary.lastUpdated, .distantPast)
+    }
+
+    @MainActor
+    func testSwiftDataDashboardCacheSavesAndLoadsSplitSections() throws {
+        let context = try makeInMemoryModelContext()
+        let cache = SwiftDataDashboardCache(modelContext: context)
+        let summary = dashboardSnapshot(steps: 2_468, lastUpdated: Date(timeIntervalSince1970: 1_000))
+        let activity = cachedActivityData(loadedAt: Date(timeIntervalSince1970: 1_100))
+        let workoutLoadedAt = Date(timeIntervalSince1970: 1_200)
+        let workout = workoutDetail(startTime: Date(timeIntervalSince1970: 900))
+        let health = cachedHealthData(loadedAt: Date(timeIntervalSince1970: 1_300))
+
+        cache.saveSummary(summary)
+        cache.saveActivityData(activity)
+        cache.saveWorkouts([workout], loadedAt: workoutLoadedAt)
+        cache.saveHealthData(health)
+
+        let loaded = try XCTUnwrap(cache.loadFitnessData())
+        XCTAssertEqual(cache.loadSummary(), summary)
+        XCTAssertEqual(loaded.summary, summary)
+        XCTAssertEqual(loaded.activity, activity)
+        XCTAssertEqual(loaded.workouts, [workout])
+        XCTAssertEqual(loaded.workoutsLoadedAt, workoutLoadedAt)
+        XCTAssertEqual(loaded.health, health)
+    }
+
+    @MainActor
+    func testSwiftDataDashboardCacheFallsBackToLegacyFullSnapshot() throws {
+        let context = try makeInMemoryModelContext()
+        let summary = dashboardSnapshot(steps: 2_468, lastUpdated: Date(timeIntervalSince1970: 1_000))
+        let legacy = FitnessDataSnapshot(
+            summary: summary,
+            activity: cachedActivityData(loadedAt: Date(timeIntervalSince1970: 1_100)),
+            workouts: [workoutDetail(startTime: Date(timeIntervalSince1970: 900))],
+            workoutsLoadedAt: Date(timeIntervalSince1970: 1_200),
+            health: cachedHealthData(loadedAt: Date(timeIntervalSince1970: 1_300)),
+            lastUpdated: Date(timeIntervalSince1970: 1_300)
+        )
+        context.insert(
+            CachedDashboardSnapshot(
+                data: try encodeLegacyFitnessSnapshot(legacy),
+                updatedAt: legacy.lastUpdated
+            )
+        )
+        try context.save()
+
+        let cache = SwiftDataDashboardCache(modelContext: context)
+
+        XCTAssertEqual(cache.loadFitnessData(), legacy)
+        XCTAssertEqual(cache.loadSummary(), summary)
+    }
+
+    @MainActor
+    func testSwiftDataDashboardCacheClearHealthDataDeletesLegacyAndSplitRows() throws {
+        let context = try makeInMemoryModelContext()
+        let cache = SwiftDataDashboardCache(modelContext: context)
+        let summary = dashboardSnapshot(steps: 2_468, lastUpdated: Date(timeIntervalSince1970: 1_000))
+        let legacy = FitnessDataSnapshot.fromLegacyDashboard(summary)
+        context.insert(
+            CachedDashboardSnapshot(
+                data: try encodeLegacyFitnessSnapshot(legacy),
+                updatedAt: legacy.lastUpdated
+            )
+        )
+        cache.saveSummary(summary)
+        cache.saveActivityData(cachedActivityData(loadedAt: Date(timeIntervalSince1970: 1_100)))
+        cache.saveWorkouts(
+            [workoutDetail(startTime: Date(timeIntervalSince1970: 900))],
+            loadedAt: Date(timeIntervalSince1970: 1_200)
+        )
+        cache.saveHealthData(cachedHealthData(loadedAt: Date(timeIntervalSince1970: 1_300)))
+
+        cache.clearHealthData()
+
+        XCTAssertNil(cache.loadFitnessData())
+        XCTAssertNil(cache.loadSummary())
+        XCTAssertTrue(try context.fetch(FetchDescriptor<CachedDashboardSnapshot>()).isEmpty)
+        XCTAssertTrue(try context.fetch(FetchDescriptor<CachedDashboardSection>()).isEmpty)
     }
 
     func testHealthDashboardVisibilityHidesEmptyGroups() {
@@ -851,6 +1001,51 @@ private final class InMemoryDashboardCache: DashboardCaching {
         fitnessSnapshot = FitnessDataSnapshot.fromLegacyDashboard(snapshot)
     }
 
+    func loadSummary() -> DashboardSnapshot? {
+        fitnessSnapshot?.summary ?? snapshot
+    }
+
+    func saveSummary(_ snapshot: DashboardSnapshot) {
+        self.snapshot = snapshot
+        if fitnessSnapshot == nil {
+            fitnessSnapshot = FitnessDataSnapshot.fromLegacyDashboard(snapshot)
+        } else {
+            fitnessSnapshot?.summary = snapshot
+        }
+    }
+
+    func loadActivityData() -> ActivityDashboardData? {
+        fitnessSnapshot?.activity
+    }
+
+    func saveActivityData(_ data: ActivityDashboardData) {
+        var snapshot = loadFitnessData() ?? .empty(goals: preferences.goals)
+        snapshot.activity = data
+        saveFitnessData(snapshot)
+    }
+
+    func loadWorkouts() -> (workouts: [WorkoutDetail], loadedAt: Date?)? {
+        guard let snapshot = loadFitnessData() else { return nil }
+        return (snapshot.workouts, snapshot.workoutsLoadedAt)
+    }
+
+    func saveWorkouts(_ workouts: [WorkoutDetail], loadedAt: Date?) {
+        var snapshot = loadFitnessData() ?? .empty(goals: preferences.goals)
+        snapshot.workouts = workouts
+        snapshot.workoutsLoadedAt = loadedAt
+        saveFitnessData(snapshot)
+    }
+
+    func loadHealthData() -> HealthDashboardData? {
+        fitnessSnapshot?.health
+    }
+
+    func saveHealthData(_ data: HealthDashboardData) {
+        var snapshot = loadFitnessData() ?? .empty(goals: preferences.goals)
+        snapshot.health = data
+        saveFitnessData(snapshot)
+    }
+
     func loadFitnessData() -> FitnessDataSnapshot? {
         fitnessSnapshot ?? snapshot.map(FitnessDataSnapshot.fromLegacyDashboard)
     }
@@ -898,6 +1093,121 @@ private func dashboardSnapshot(
         lastUpdated: lastUpdated,
         syncState: syncState
     )
+}
+
+private func cachedActivityData(loadedAt: Date) -> ActivityDashboardData {
+    ActivityDashboardData(
+        dailySeries: [
+            NumericMetricSeries(
+                type: .steps,
+                points: [
+                    NumericMetricPoint(
+                        id: "cached-steps-\(loadedAt.timeIntervalSince1970)",
+                        startDate: loadedAt,
+                        value: 2_468,
+                        unit: "steps"
+                    )
+                ],
+                rangeStart: loadedAt.addingTimeInterval(-86_400),
+                rangeEnd: loadedAt
+            )
+        ],
+        hourlySeries: [
+            NumericMetricSeries(
+                type: .distance,
+                points: [
+                    NumericMetricPoint(
+                        id: "cached-distance-\(loadedAt.timeIntervalSince1970)",
+                        startDate: loadedAt,
+                        value: 1_851,
+                        unit: "m"
+                    )
+                ],
+                rangeStart: loadedAt.addingTimeInterval(-3_600),
+                rangeEnd: loadedAt
+            )
+        ],
+        bucketedSeries: [
+            BucketedMetricSeries(
+                type: .activeMinutes,
+                title: "Activity Intensity",
+                buckets: [
+                    MetricBucket(label: "Light", value: 30, unit: "min")
+                ],
+                rangeStart: loadedAt.addingTimeInterval(-86_400),
+                rangeEnd: loadedAt
+            )
+        ],
+        loadedAt: loadedAt
+    )
+}
+
+private func workoutDetail(startTime: Date) -> WorkoutDetail {
+    WorkoutDetail(
+        id: "workout-\(startTime.timeIntervalSince1970)",
+        type: "Walk",
+        startTime: startTime,
+        endTime: startTime.addingTimeInterval(1_200),
+        activeDurationSeconds: 1_200,
+        metricsSummary: WorkoutMetricsSummary(
+            caloriesKcal: 154,
+            distanceMeters: 1_140,
+            steps: 1_512,
+            elevationGainMeters: nil,
+            averageHeartRate: 122,
+            maxHeartRate: nil,
+            averageSpeedMetersPerSecond: nil,
+            averagePaceSecondsPerKilometer: nil
+        ),
+        splits: [],
+        zoneMinutes: []
+    )
+}
+
+private func cachedHealthData(loadedAt: Date) -> HealthDashboardData {
+    let point = NumericMetricPoint(
+        id: "heart-\(loadedAt.timeIntervalSince1970)",
+        startDate: loadedAt,
+        value: 72,
+        unit: "bpm"
+    )
+
+    return HealthDashboardData(
+        heartSeries: [NumericMetricSeries(type: .heartRate, points: [point])],
+        sleepMetricSeries: [],
+        vitalSeries: [],
+        cardioFitnessSeries: [],
+        bodySeries: [],
+        sleepSessions: [
+            SleepSession(
+                id: "sleep-\(loadedAt.timeIntervalSince1970)",
+                startTime: loadedAt.addingTimeInterval(-28_800),
+                endTime: loadedAt.addingTimeInterval(-3_600),
+                durationSeconds: 25_200,
+                stages: []
+            )
+        ],
+        loadedAt: loadedAt
+    )
+}
+
+@MainActor
+private func makeInMemoryModelContext() throws -> ModelContext {
+    let configuration = ModelConfiguration(isStoredInMemoryOnly: true)
+    let container = try ModelContainer(
+        for: CachedDashboardSnapshot.self,
+        CachedDashboardSection.self,
+        CachedPreferences.self,
+        configurations: configuration
+    )
+
+    return ModelContext(container)
+}
+
+private func encodeLegacyFitnessSnapshot(_ snapshot: FitnessDataSnapshot) throws -> Data {
+    let encoder = JSONEncoder()
+    encoder.dateEncodingStrategy = .iso8601
+    return try encoder.encode(FitnessDataSnapshot.CodableSnapshot(snapshot))
 }
 
 private func activityGoalInsight(
