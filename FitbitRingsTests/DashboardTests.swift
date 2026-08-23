@@ -27,6 +27,43 @@ final class DashboardTests: XCTestCase {
         )
     }
 
+    func testActivitySeriesLookupsKeepDailyAndHourlyDistinct() {
+        let day = Date(timeIntervalSince1970: 1_800)
+        let hour = Date(timeIntervalSince1970: 3_600)
+        let dailySteps = NumericMetricSeries(
+            type: .steps,
+            points: [
+                NumericMetricPoint(
+                    id: "daily-steps",
+                    startDate: day,
+                    value: 8_000,
+                    unit: "steps"
+                )
+            ]
+        )
+        let hourlySteps = NumericMetricSeries(
+            type: .steps,
+            points: [
+                NumericMetricPoint(
+                    id: "hourly-steps",
+                    startDate: hour,
+                    value: 450,
+                    unit: "steps"
+                )
+            ]
+        )
+        let activityData = ActivityDashboardData(
+            dailySeries: [dailySteps],
+            hourlySeries: [hourlySteps],
+            bucketedSeries: [],
+            loadedAt: nil
+        )
+
+        XCTAssertEqual(activityData.series(for: .steps), dailySteps)
+        XCTAssertEqual(activityData.dailySeries(for: .steps), dailySteps)
+        XCTAssertEqual(activityData.hourlySeries(for: .steps), hourlySteps)
+    }
+
     func testDurationPartsUseCompactMetricCardUnits() {
         XCTAssertEqual(
             DashboardFormatting.durationParts(2_940),

@@ -46,7 +46,6 @@ struct TodayGoalsSection: View {
 
     private var goalCards: [FitnessGoalCardModel] {
         let distance = DashboardFormatting.distanceParts(snapshot.activity.distanceMeters, unit: units.distanceUnit)
-        let summaryDayLabel = DashboardFormatting.compactDayLabel(for: snapshot.date)
         var cards: [FitnessGoalCardModel] = [
             FitnessGoalCardModel(
                 title: "Steps",
@@ -54,7 +53,6 @@ struct TodayGoalsSection: View {
                     type: .steps,
                     value: DashboardFormatting.integer(Double(snapshot.activity.steps))
                 ),
-                subtitle: summaryDayLabel,
                 progress: progressValue(type: .steps, progress: snapshot.rings.steps.progress),
                 systemImage: "shoeprints.fill",
                 accentColor: .stepsRing,
@@ -68,7 +66,6 @@ struct TodayGoalsSection: View {
                     value: DashboardFormatting.integer(snapshot.rings.active.value)
                 ),
                 unit: unitText(type: .activeMinutes, unit: "m"),
-                subtitle: summaryDayLabel,
                 progress: progressValue(type: .activeMinutes, progress: snapshot.rings.active.progress),
                 systemImage: "figure.run",
                 accentColor: .activeRing,
@@ -83,7 +80,6 @@ struct TodayGoalsSection: View {
                     value: DashboardFormatting.integer(snapshot.activity.activeCalories)
                 ),
                 unit: unitText(type: .activeEnergyBurned, unit: "kcal"),
-                subtitle: summaryDayLabel,
                 progress: progressValue(type: .activeEnergyBurned, progress: snapshot.rings.move.progress),
                 systemImage: "flame.fill",
                 accentColor: .moveRing,
@@ -95,7 +91,6 @@ struct TodayGoalsSection: View {
                 title: "Distance",
                 value: valueText(type: .distance, value: distance.value),
                 unit: unitText(type: .distance, unit: distance.unit),
-                subtitle: summaryDayLabel,
                 systemImage: "map.fill",
                 accentColor: .distanceAccent,
                 dataType: .distance,
@@ -108,7 +103,6 @@ struct TodayGoalsSection: View {
                     value: DashboardFormatting.integer(snapshot.activity.totalCalories)
                 ),
                 unit: unitText(type: .totalCalories, unit: "kcal"),
-                subtitle: summaryDayLabel,
                 systemImage: "flame.circle.fill",
                 accentColor: .calorieAccent,
                 dataType: .totalCalories,
@@ -134,7 +128,6 @@ struct TodayGoalsSection: View {
                 title: "Resting Heart",
                 value: snapshot.heart.restingHeartRate.map(String.init) ?? "No data",
                 unit: snapshot.heart.restingHeartRate == nil ? "" : "bpm",
-                subtitle: summaryDayLabel,
                 systemImage: "heart.circle.fill",
                 accentColor: .heartAccent,
                 dataType: .dailyRestingHeartRate,

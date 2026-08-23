@@ -88,7 +88,6 @@ struct SummaryHourlyPairSection: View {
                 title: "Steps",
                 value: stepsValue,
                 unit: stepsUnit,
-                subtitle: DashboardFormatting.compactDayLabel(for: snapshot.summary.date),
                 systemImage: GoogleHealthDataType.steps.symbolName,
                 accentColor: .stepsRing,
                 points: stepsPoints,
@@ -102,7 +101,6 @@ struct SummaryHourlyPairSection: View {
                 title: "Distance",
                 value: distanceValue.value,
                 unit: distanceValue.unit,
-                subtitle: DashboardFormatting.compactDayLabel(for: snapshot.summary.date),
                 systemImage: GoogleHealthDataType.distance.symbolName,
                 accentColor: .distanceAccent,
                 points: distancePoints,
@@ -557,8 +555,8 @@ private struct MetricDetailView: View {
                     subtitle: latestSubtitle(for: series),
                     systemImage: type.symbolName,
                     accentColor: type.accentColor,
-                    points: series?.points ?? [],
-                    isAvailable: series?.latestPoint != nil
+                    points: latestCardPoints(fallback: series),
+                    isAvailable: latestIsAvailable(fallback: series)
                 )
 
                 if let series, !series.points.isEmpty {
@@ -583,6 +581,10 @@ private struct MetricDetailView: View {
     }
 
     private func latestValue(for series: NumericMetricSeries?) -> String {
+        if let todayActivityValue {
+            return todayActivityValue.value
+        }
+
         guard let point = series?.latestPoint else {
             return "No data"
         }
@@ -590,6 +592,10 @@ private struct MetricDetailView: View {
     }
 
     private func latestUnit(for series: NumericMetricSeries?) -> String {
+        if let todayActivityValue {
+            return todayActivityValue.unit
+        }
+
         guard let point = series?.latestPoint else {
             return ""
         }
@@ -597,7 +603,49 @@ private struct MetricDetailView: View {
     }
 
     private func latestSubtitle(for series: NumericMetricSeries?) -> String? {
-        series?.latestPoint.map { "Recorded \($0.dashboardDateLabel(for: type))" }
+        if usesTodayActivityPresentation, todayActivityValue != nil {
+            return "Recorded \(DashboardFormatting.compactDayLabel(for: store.snapshot.summary.date))"
+        }
+
+        return series?.latestPoint.map { "Recorded \($0.dashboardDateLabel(for: type))" }
+    }
+
+    private func latestCardPoints(fallback series: NumericMetricSeries?) -> [NumericMetricPoint] {
+        guard usesTodayActivityPresentation else {
+            return series?.points ?? []
+        }
+
+        return store.snapshot.activity.hourlySeries(for: type)?.points ?? []
+    }
+
+    private func latestIsAvailable(fallback series: NumericMetricSeries?) -> Bool {
+        guard usesTodayActivityPresentation else {
+            return series?.latestPoint != nil
+        }
+
+        return todayActivityValue != nil
+    }
+
+    private var todayActivityValue: DashboardFormatting.MetricValue? {
+        let activity = store.snapshot.summary.activity
+        switch type {
+        case .steps where activity.hasData(for: .steps):
+            return DashboardFormatting.MetricValue(
+                value: DashboardFormatting.integer(Double(activity.steps)),
+                unit: "steps"
+            )
+        case .distance where activity.hasData(for: .distance):
+            return DashboardFormatting.distanceParts(
+                activity.distanceMeters,
+                unit: store.preferences.units.distanceUnit
+            )
+        default:
+            return nil
+        }
+    }
+
+    private var usesTodayActivityPresentation: Bool {
+        type == .steps || type == .distance
     }
 }
 
@@ -1236,7 +1284,6 @@ private struct DashboardSeriesSection: View {
                             title: item.title,
                             value: metricValue?.value ?? "No data",
                             unit: metricValue?.unit ?? "",
-                            subtitle: item.rangeSubtitle,
                             systemImage: item.type.symbolName,
                             accentColor: item.type.accentColor,
                             points: item.points,
@@ -1343,16 +1390,16 @@ private struct HealthSeriesCard: View {
         return DashboardFormatting.metricValue(latest.value, type: series.type, units: units)
     }
 
-    private var subtitle: String {
+    private var subtitle: String? {
         guard let latest = series.latestPoint else {
-            return series.rangeSubtitle
+            return nil
         }
 
         if series.points.count <= 1 {
             return "Measured \(latest.dashboardDateLabel(for: series.type))"
         }
 
-        return series.rangeSubtitle
+        return nil
     }
 
     private var chartPoints: [NumericMetricPoint] {

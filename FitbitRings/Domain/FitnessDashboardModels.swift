@@ -266,8 +266,15 @@ struct ActivityDashboardData: Codable, Equatable, Sendable {
     )
 
     func series(for type: GoogleHealthDataType) -> NumericMetricSeries? {
+        dailySeries(for: type) ?? hourlySeries(for: type)
+    }
+
+    func dailySeries(for type: GoogleHealthDataType) -> NumericMetricSeries? {
         dailySeries.first { $0.type == type }
-            ?? hourlySeries.first { $0.type == type }
+    }
+
+    func hourlySeries(for type: GoogleHealthDataType) -> NumericMetricSeries? {
+        hourlySeries.first { $0.type == type }
     }
 
     var isEmpty: Bool {
