@@ -528,6 +528,28 @@ final class DashboardTests: XCTestCase {
         )
     }
 
+    func testCompactDayLabelUsesYesterdayForPreviousDay() throws {
+        let calendar = utcCalendar()
+        let now = try date(year: 2026, month: 8, day: 22, hour: 16, calendar: calendar)
+        let previousDay = try date(year: 2026, month: 8, day: 21, hour: 23, calendar: calendar)
+
+        XCTAssertEqual(
+            DashboardFormatting.compactDayLabel(for: previousDay, relativeTo: now, calendar: calendar),
+            "Yesterday"
+        )
+    }
+
+    func testCompactDayLabelIncludesYearWhenNeeded() throws {
+        let calendar = utcCalendar()
+        let now = try date(year: 2026, month: 1, day: 2, calendar: calendar)
+        let previousYear = try date(year: 2025, month: 12, day: 31, calendar: calendar)
+
+        XCTAssertEqual(
+            DashboardFormatting.compactDayLabel(for: previousYear, relativeTo: now, calendar: calendar),
+            "Dec 31, 2025"
+        )
+    }
+
     func testCompactRangeLabelUsesMonthDayRange() throws {
         let calendar = utcCalendar()
         let now = try date(year: 2026, month: 8, day: 22, calendar: calendar)
@@ -536,28 +558,76 @@ final class DashboardTests: XCTestCase {
 
         XCTAssertEqual(
             DashboardFormatting.compactRangeLabel(start: start, end: end, relativeTo: now, calendar: calendar),
-            "Aug 8-Aug 22"
+            "Aug 8 - Today"
         )
     }
 
-    func testCompactDateTimeRangeLabelSeparatesDateAndTime() throws {
+    func testCompactRangeLabelHandlesExclusiveMidnightEnd() throws {
+        let calendar = utcCalendar()
+        let now = try date(year: 2026, month: 8, day: 22, hour: 16, calendar: calendar)
+        let start = try date(year: 2026, month: 8, day: 9, calendar: calendar)
+        let exclusiveEnd = try date(year: 2026, month: 8, day: 23, calendar: calendar)
+
+        XCTAssertEqual(
+            DashboardFormatting.compactRangeLabel(
+                start: start,
+                end: exclusiveEnd,
+                relativeTo: now,
+                calendar: calendar,
+                treatsEndAsExclusive: true
+            ),
+            "Aug 9 - Today"
+        )
+    }
+
+    func testCompactDateTimeRangeLabelUsesInlineDayTimesAcrossDays() throws {
         let calendar = utcCalendar()
         let now = try date(year: 2026, month: 8, day: 22, calendar: calendar)
         let start = try date(year: 2026, month: 8, day: 20, hour: 23, minute: 37, calendar: calendar)
         let end = try date(year: 2026, month: 8, day: 21, hour: 7, minute: 31, calendar: calendar)
 
-        let label = try XCTUnwrap(
+        XCTAssertEqual(
             DashboardFormatting.compactDateTimeRangeLabel(
                 start: start,
                 end: end,
                 relativeTo: now,
                 calendar: calendar
-            )
+            ),
+            "Aug 20, 11:37 PM - Yesterday, 7:31 AM"
         )
-        let parts = label.components(separatedBy: "  |  ")
+    }
 
-        XCTAssertEqual(parts.count, 2)
-        XCTAssertEqual(parts.first, "Aug 20-Aug 21")
+    func testCompactDateTimeRangeLabelUsesSingleDayForSameDayRange() throws {
+        let calendar = utcCalendar()
+        let now = try date(year: 2026, month: 8, day: 22, calendar: calendar)
+        let start = try date(year: 2026, month: 8, day: 22, hour: 6, minute: 15, calendar: calendar)
+        let end = try date(year: 2026, month: 8, day: 22, hour: 7, minute: 45, calendar: calendar)
+
+        XCTAssertEqual(
+            DashboardFormatting.compactDateTimeRangeLabel(
+                start: start,
+                end: end,
+                relativeTo: now,
+                calendar: calendar
+            ),
+            "Today, 6:15 AM - 7:45 AM"
+        )
+    }
+
+    func testCompactDateTimeRangeLabelOmitsMissingEndpointPlaceholders() throws {
+        let calendar = utcCalendar()
+        let now = try date(year: 2026, month: 8, day: 22, calendar: calendar)
+        let end = try date(year: 2026, month: 8, day: 22, hour: 7, minute: 31, calendar: calendar)
+
+        XCTAssertEqual(
+            DashboardFormatting.compactDateTimeRangeLabel(
+                start: nil,
+                end: end,
+                relativeTo: now,
+                calendar: calendar
+            ),
+            "Ends Today, 7:31 AM"
+        )
     }
 
     func testMissingScopesErrorNamesScopes() {

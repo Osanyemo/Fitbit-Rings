@@ -215,12 +215,13 @@ private struct ActivityHeader: View {
         Text(headerSubtitle)
             .font(.headline.weight(.bold))
             .foregroundStyle(.secondary)
-            .lineLimit(2)
             .minimumScaleFactor(0.78)
+            .allowsTightening(true)
+            .fixedSize(horizontal: false, vertical: true)
     }
 
     private var headerSubtitle: String {
-        date.formatted(date: .abbreviated, time: .omitted)
+        DashboardFormatting.compactDayLabel(for: date)
     }
 }
 

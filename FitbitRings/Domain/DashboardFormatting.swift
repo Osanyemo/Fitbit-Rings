@@ -57,7 +57,7 @@ enum DashboardFormatting {
 
     static func time(_ date: Date?) -> String {
         guard let date else { return "--" }
-        return date.formatted(date: .omitted, time: .shortened)
+        return compactTime(date, calendar: .current)
     }
 
     static func compactDayLabel(
@@ -69,7 +69,12 @@ enum DashboardFormatting {
             return "Today"
         }
 
-        return compactMonthDay(date, calendar: calendar)
+        if let yesterday = calendar.date(byAdding: .day, value: -1, to: calendar.startOfDay(for: now)),
+           calendar.isDate(date, inSameDayAs: yesterday) {
+            return "Yesterday"
+        }
+
+        return compactCalendarDate(date, relativeTo: now, calendar: calendar)
     }
 
     static func compactDateTimeLabel(
@@ -77,31 +82,49 @@ enum DashboardFormatting {
         relativeTo now: Date = .now,
         calendar: Calendar = .current
     ) -> String {
-        "\(compactDayLabel(for: date, relativeTo: now, calendar: calendar)) \(time(date))"
+        "\(compactDayLabel(for: date, relativeTo: now, calendar: calendar)), \(compactTime(date, calendar: calendar))"
     }
 
     static func compactRangeLabel(
         start: Date,
         end: Date,
         relativeTo now: Date = .now,
-        calendar: Calendar = .current
+        calendar: Calendar = .current,
+        treatsEndAsExclusive: Bool = false
     ) -> String {
-        if calendar.isDate(start, inSameDayAs: end) {
+        let displayEnd = rangeDisplayEnd(
+            start: start,
+            end: end,
+            calendar: calendar,
+            treatsEndAsExclusive: treatsEndAsExclusive
+        )
+
+        if calendar.isDate(start, inSameDayAs: displayEnd) {
             return compactDayLabel(for: start, relativeTo: now, calendar: calendar)
         }
 
-        return "\(compactMonthDay(start, calendar: calendar))-\(compactMonthDay(end, calendar: calendar))"
+        return [
+            compactDayLabel(for: start, relativeTo: now, calendar: calendar),
+            compactDayLabel(for: displayEnd, relativeTo: now, calendar: calendar)
+        ].joined(separator: " - ")
     }
 
     static func compactRangeLabel(
         start: Date?,
         end: Date?,
         relativeTo now: Date = .now,
-        calendar: Calendar = .current
+        calendar: Calendar = .current,
+        treatsEndAsExclusive: Bool = false
     ) -> String? {
         switch (start, end) {
         case let (start?, end?):
-            return compactRangeLabel(start: start, end: end, relativeTo: now, calendar: calendar)
+            return compactRangeLabel(
+                start: start,
+                end: end,
+                relativeTo: now,
+                calendar: calendar,
+                treatsEndAsExclusive: treatsEndAsExclusive
+            )
         case let (start?, nil):
             return compactDayLabel(for: start, relativeTo: now, calendar: calendar)
         case let (nil, end?):
@@ -121,9 +144,24 @@ enum DashboardFormatting {
             return nil
         }
 
-        let dateLabel = compactRangeLabel(start: start, end: end, relativeTo: now, calendar: calendar)
-        let timeRange = "\(time(start))-\(time(end))"
-        return [dateLabel, timeRange].compactMap { $0 }.joined(separator: "  |  ")
+        switch (start, end) {
+        case let (start?, end?):
+            let startTime = compactTime(start, calendar: calendar)
+            let endTime = compactTime(end, calendar: calendar)
+
+            if calendar.isDate(start, inSameDayAs: end) {
+                let day = compactDayLabel(for: start, relativeTo: now, calendar: calendar)
+                return "\(day), \(startTime) - \(endTime)"
+            }
+
+            return "\(compactDateTimeLabel(for: start, relativeTo: now, calendar: calendar)) - \(compactDateTimeLabel(for: end, relativeTo: now, calendar: calendar))"
+        case let (start?, nil):
+            return "Starts \(compactDateTimeLabel(for: start, relativeTo: now, calendar: calendar))"
+        case let (nil, end?):
+            return "Ends \(compactDateTimeLabel(for: end, relativeTo: now, calendar: calendar))"
+        case (nil, nil):
+            return nil
+        }
     }
 
     static func relativeUpdate(_ date: Date) -> String {
@@ -133,12 +171,20 @@ enum DashboardFormatting {
         return "Updated \(formatter.localizedString(for: date, relativeTo: .now))"
     }
 
-    static func compactUpdate(_ date: Date, relativeTo now: Date = .now) -> String {
-        let age = compactUpdateAge(date, relativeTo: now)
+    static func compactUpdate(
+        _ date: Date,
+        relativeTo now: Date = .now,
+        calendar: Calendar = .current
+    ) -> String {
+        let age = compactUpdateAge(date, relativeTo: now, calendar: calendar)
         return age == "Not synced" ? age : "Updated \(age)"
     }
 
-    static func compactUpdateAge(_ date: Date, relativeTo now: Date = .now) -> String {
+    static func compactUpdateAge(
+        _ date: Date,
+        relativeTo now: Date = .now,
+        calendar: Calendar = .current
+    ) -> String {
         guard date > .distantPast else { return "Not synced" }
 
         let elapsed = max(0, now.timeIntervalSince(date))
@@ -159,15 +205,48 @@ enum DashboardFormatting {
             return "\(Int(elapsed / 86_400))d ago"
         }
 
-        return date.formatted(date: .abbreviated, time: .omitted)
+        return compactCalendarDate(date, relativeTo: now, calendar: calendar)
     }
 
-    private static func compactMonthDay(_ date: Date, calendar: Calendar) -> String {
+    private static func compactCalendarDate(
+        _ date: Date,
+        relativeTo now: Date,
+        calendar: Calendar
+    ) -> String {
         let formatter = DateFormatter()
         formatter.calendar = calendar
         formatter.timeZone = calendar.timeZone
         formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.dateFormat = "MMM d"
+        if calendar.isDate(date, equalTo: now, toGranularity: .year) {
+            formatter.dateFormat = "MMM d"
+        } else {
+            formatter.dateFormat = "MMM d, yyyy"
+        }
         return formatter.string(from: date)
+    }
+
+    private static func compactTime(_ date: Date, calendar: Calendar) -> String {
+        let formatter = DateFormatter()
+        formatter.calendar = calendar
+        formatter.timeZone = calendar.timeZone
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "h:mm a"
+        return formatter.string(from: date)
+    }
+
+    private static func rangeDisplayEnd(
+        start: Date,
+        end: Date,
+        calendar: Calendar,
+        treatsEndAsExclusive: Bool
+    ) -> Date {
+        guard treatsEndAsExclusive,
+              end > start,
+              end == calendar.startOfDay(for: end),
+              let adjustedEnd = calendar.date(byAdding: .second, value: -1, to: end) else {
+            return end
+        }
+
+        return adjustedEnd
     }
 }

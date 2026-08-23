@@ -360,7 +360,7 @@ private struct HealthOverviewSection: View {
             title: series.type.displayName,
             value: value.value,
             unit: value.unit,
-            subtitle: "Measured \(DashboardFormatting.compactDateTimeLabel(for: latest.startDate))",
+            subtitle: "Measured \(latest.dashboardDateLabel(for: series.type))",
             systemImage: series.type.symbolName,
             accentColor: series.type.accentColor,
             destination: .metric(series.type)
@@ -457,9 +457,9 @@ private struct HealthOverviewCard: View {
                     Text(item.subtitle)
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(.secondary)
-                        .lineLimit(2, reservesSpace: true)
                         .minimumScaleFactor(0.72)
                         .allowsTightening(true)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
                 .layoutPriority(1)
 
@@ -554,7 +554,7 @@ private struct MetricDetailView: View {
                     title: "Latest",
                     value: latestValue(for: series),
                     unit: latestUnit(for: series),
-                    subtitle: series?.latestPoint.map { "Recorded \(DashboardFormatting.compactDateTimeLabel(for: $0.startDate))" },
+                    subtitle: latestSubtitle(for: series),
                     systemImage: type.symbolName,
                     accentColor: type.accentColor,
                     points: series?.points ?? [],
@@ -594,6 +594,10 @@ private struct MetricDetailView: View {
             return ""
         }
         return DashboardFormatting.metricValue(point.value, type: type, units: store.preferences.units).unit
+    }
+
+    private func latestSubtitle(for series: NumericMetricSeries?) -> String? {
+        series?.latestPoint.map { "Recorded \($0.dashboardDateLabel(for: type))" }
     }
 }
 
@@ -755,8 +759,9 @@ private struct DashboardLargeHeader: View {
                 Text(subtitle)
                     .font(.headline.weight(.semibold))
                     .foregroundStyle(.secondary)
-                    .lineLimit(2)
                     .minimumScaleFactor(0.78)
+                    .allowsTightening(true)
+                    .fixedSize(horizontal: false, vertical: true)
             }
 
             if let error = state?.errorMessage {
@@ -1144,10 +1149,10 @@ struct DashboardMetricCard: View {
                 Text(subtitle)
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(.secondary)
-                    .lineLimit(2, reservesSpace: true)
                     .minimumScaleFactor(0.72)
                     .allowsTightening(true)
                     .frame(maxWidth: .infinity, alignment: .leading)
+                    .fixedSize(horizontal: false, vertical: true)
             }
 
             Spacer(minLength: 0)
@@ -1344,7 +1349,7 @@ private struct HealthSeriesCard: View {
         }
 
         if series.points.count <= 1 {
-            return "Measured \(DashboardFormatting.compactDateTimeLabel(for: latest.startDate))"
+            return "Measured \(latest.dashboardDateLabel(for: series.type))"
         }
 
         return series.rangeSubtitle
@@ -1385,7 +1390,11 @@ private struct BucketDistributionCard: View {
                     Text(series.rangeSubtitle)
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(.secondary)
+                        .minimumScaleFactor(0.72)
+                        .allowsTightening(true)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
+                .layoutPriority(1)
 
                 Spacer(minLength: 12)
 
@@ -1513,9 +1522,9 @@ private struct HealthSleepSessionCard: View {
                     Text(sleepRange)
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(.secondary)
-                        .lineLimit(2)
                         .minimumScaleFactor(0.70)
                         .allowsTightening(true)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
                 .layoutPriority(1)
 
@@ -1730,9 +1739,9 @@ private struct WorkoutRowCard: View {
                     Text(DashboardFormatting.compactDateTimeLabel(for: workout.startTime))
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(.secondary)
-                        .lineLimit(1)
                         .minimumScaleFactor(0.72)
                         .allowsTightening(true)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
                 .layoutPriority(1)
 
@@ -1950,18 +1959,56 @@ private struct MetricPointList: View {
 
             ForEach(series.points.sorted { $0.startDate > $1.startDate }) { point in
                 let value = DashboardFormatting.metricValue(point.value, type: series.type, units: units)
-                HStack {
-                    Text(DashboardFormatting.compactDateTimeLabel(for: point.startDate))
-                        .font(.subheadline.weight(.semibold))
-                    Spacer()
-                    Text(value.unit.isEmpty ? value.value : "\(value.value) \(value.unit)")
-                        .font(.headline.monospacedDigit())
-                        .foregroundStyle(.secondary)
-                }
-                .padding(14)
-                .background(.summarySurface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                MetricPointRow(
+                    dateLabel: point.dashboardDateLabel(for: series.type),
+                    value: value.unit.isEmpty ? value.value : "\(value.value) \(value.unit)"
+                )
             }
         }
+    }
+}
+
+private struct MetricPointRow: View {
+    let dateLabel: String
+    let value: String
+
+    var body: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(alignment: .firstTextBaseline, spacing: 12) {
+                dateText
+
+                Spacer(minLength: 12)
+
+                valueText
+                    .fixedSize(horizontal: true, vertical: false)
+            }
+
+            VStack(alignment: .leading, spacing: 6) {
+                dateText
+                valueText
+            }
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(.summarySurface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+    }
+
+    private var dateText: some View {
+        Text(dateLabel)
+            .font(.subheadline.weight(.semibold))
+            .foregroundStyle(.primary)
+            .minimumScaleFactor(0.72)
+            .allowsTightening(true)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+
+    private var valueText: some View {
+        Text(value)
+            .font(.headline.monospacedDigit())
+            .foregroundStyle(.secondary)
+            .lineLimit(1)
+            .minimumScaleFactor(0.72)
+            .allowsTightening(true)
     }
 }
 
@@ -2115,7 +2162,7 @@ private extension NumericMetricSeries {
         guard let start = rangeStart, let end = rangeEnd else {
             return "Last 14 days"
         }
-        return DashboardFormatting.compactRangeLabel(start: start, end: end)
+        return DashboardFormatting.compactRangeLabel(start: start, end: end, treatsEndAsExclusive: true)
     }
 }
 
@@ -2124,7 +2171,35 @@ private extension BucketedMetricSeries {
         guard let start = rangeStart, let end = rangeEnd else {
             return "Last 14 days"
         }
-        return DashboardFormatting.compactRangeLabel(start: start, end: end)
+        return DashboardFormatting.compactRangeLabel(start: start, end: end, treatsEndAsExclusive: true)
+    }
+}
+
+private extension NumericMetricPoint {
+    func dashboardDateLabel(for type: GoogleHealthDataType, calendar: Calendar = .current) -> String {
+        switch type.recordKind {
+        case .sample:
+            return DashboardFormatting.compactDateTimeLabel(for: startDate, calendar: calendar)
+        case .session:
+            return DashboardFormatting.compactDateTimeRangeLabel(
+                start: startDate,
+                end: endDate,
+                calendar: calendar
+            ) ?? DashboardFormatting.compactDateTimeLabel(for: startDate, calendar: calendar)
+        case .daily:
+            return DashboardFormatting.compactDayLabel(for: startDate, calendar: calendar)
+        case .interval:
+            guard let endDate, !calendar.isDate(startDate, inSameDayAs: endDate) else {
+                return DashboardFormatting.compactDayLabel(for: startDate, calendar: calendar)
+            }
+
+            return DashboardFormatting.compactRangeLabel(
+                start: startDate,
+                end: endDate,
+                calendar: calendar,
+                treatsEndAsExclusive: true
+            )
+        }
     }
 }
 

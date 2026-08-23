@@ -206,10 +206,12 @@ struct RecentWorkoutSection: View {
                                 .lineLimit(1)
                                 .minimumScaleFactor(0.76)
 
-                            Text(DashboardFormatting.compactDayLabel(for: workout.startTime))
+                            Text(DashboardFormatting.compactDateTimeLabel(for: workout.startTime))
                                 .font(.headline.weight(.semibold))
                                 .foregroundStyle(.secondary)
-                                .lineLimit(1)
+                                .minimumScaleFactor(0.74)
+                                .allowsTightening(true)
+                                .fixedSize(horizontal: false, vertical: true)
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
 
@@ -345,9 +347,9 @@ private struct FitnessGoalCard: View {
                         Text(subtitle)
                             .font(.caption.weight(.semibold))
                             .foregroundStyle(.secondary)
-                            .lineLimit(2)
                             .minimumScaleFactor(0.74)
                             .allowsTightening(true)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
                 }
                 .layoutPriority(1)
