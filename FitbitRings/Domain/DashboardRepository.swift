@@ -109,8 +109,10 @@ struct DashboardRepository {
         date: Date = .now
     ) async throws -> FitnessDataSnapshot {
         var snapshot = cachedSnapshot
+        let loadedAt = Date.now
         snapshot.workouts = try await googleHealthClient.fetchWorkoutData(date: date)
-        snapshot.lastUpdated = .now
+        snapshot.workoutsLoadedAt = loadedAt
+        snapshot.lastUpdated = loadedAt
         cache.saveFitnessData(snapshot)
         return snapshot
     }

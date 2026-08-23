@@ -309,6 +309,35 @@ final class DashboardTests: XCTestCase {
     }
 
     @MainActor
+    func testFitnessDashboardStoreFetchesWorkoutsWhenCacheOnlyHasSummaryWorkout() async {
+        var summary = dashboardSnapshot(steps: 1_234, lastUpdated: Date(timeIntervalSince1970: 1_000))
+        summary.latestWorkout = WorkoutSummary(
+            type: "Walk",
+            startTime: Date(timeIntervalSince1970: 900),
+            durationSeconds: 1_200,
+            distanceMeters: 1_140,
+            calories: 154
+        )
+        let cache = InMemoryDashboardCache()
+        cache.fitnessSnapshot = FitnessDataSnapshot.fromLegacyDashboard(summary)
+        let client = SectionedGoogleHealthClient(summary: summary)
+        let repository = DashboardRepository(googleHealthClient: client, cache: cache)
+        let store = FitnessDashboardStore(
+            repository: repository,
+            cache: cache,
+            staleAfter: .greatestFiniteMagnitude
+        )
+
+        await store.loadIfNeeded(.workouts)
+
+        let count = await client.workoutFetchCount
+        XCTAssertEqual(count, 1)
+        XCTAssertEqual(store.sectionState(.workouts).phase, .loaded)
+        XCTAssertEqual(store.snapshot.workouts.first?.metricsSummary.averageHeartRate, 122)
+        XCTAssertNotNil(store.snapshot.workoutsLoadedAt)
+    }
+
+    @MainActor
     func testFitnessDashboardStoreRefreshesStaleCachedActivity() async {
         let oldDate = Date(timeIntervalSince1970: 1_000)
         let summary = dashboardSnapshot(steps: 1_234, lastUpdated: oldDate)
@@ -754,6 +783,7 @@ private actor BlockingGoogleHealthClient: GoogleHealthServing {
 private actor SectionedGoogleHealthClient: GoogleHealthServing {
     private let summary: DashboardSnapshot
     private(set) var activityFetchCount = 0
+    private(set) var workoutFetchCount = 0
 
     init(summary: DashboardSnapshot) {
         self.summary = summary
@@ -777,6 +807,32 @@ private actor SectionedGoogleHealthClient: GoogleHealthServing {
             bucketedSeries: [],
             loadedAt: Date(timeIntervalSince1970: 1_000)
         )
+    }
+
+    func fetchWorkoutData(date: Date) async throws -> [WorkoutDetail] {
+        workoutFetchCount += 1
+        let startTime = summary.latestWorkout?.startTime ?? Date(timeIntervalSince1970: 900)
+        return [
+            WorkoutDetail(
+                id: "detailed-workout",
+                type: summary.latestWorkout?.type ?? "Walk",
+                startTime: startTime,
+                endTime: startTime.addingTimeInterval(1_200),
+                activeDurationSeconds: 1_200,
+                metricsSummary: WorkoutMetricsSummary(
+                    caloriesKcal: 154,
+                    distanceMeters: 1_140,
+                    steps: 1_512,
+                    elevationGainMeters: nil,
+                    averageHeartRate: 122,
+                    maxHeartRate: nil,
+                    averageSpeedMetersPerSecond: nil,
+                    averagePaceSecondsPerKilometer: nil
+                ),
+                splits: [],
+                zoneMinutes: []
+            )
+        ]
     }
 }
 

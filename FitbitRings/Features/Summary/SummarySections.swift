@@ -220,11 +220,7 @@ struct RecentWorkoutSection: View {
                         }
                     }
 
-                    HStack(alignment: .top, spacing: 12) {
-                        ForEach(workoutMetrics) { metric in
-                            WorkoutMetricView(metric: metric)
-                        }
-                    }
+                    WorkoutMetricsRow(metrics: workoutMetrics)
                 }
                 .padding(15)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -269,6 +265,19 @@ struct RecentWorkoutSection: View {
                         unit: "kcal"
                     ),
                     systemImage: "bolt.fill"
+                )
+            )
+        }
+
+        if let heartRate = workout.averageHeartRate {
+            metrics.append(
+                WorkoutMetricModel(
+                    title: "Avg Heart",
+                    value: DashboardFormatting.MetricValue(
+                        value: DashboardFormatting.integer(heartRate),
+                        unit: "bpm"
+                    ),
+                    systemImage: "heart.fill"
                 )
             )
         }
@@ -480,6 +489,31 @@ private struct WorkoutMetricModel: Identifiable {
     let title: String
     let value: DashboardFormatting.MetricValue
     let systemImage: String
+}
+
+private struct WorkoutMetricsRow: View {
+    let metrics: [WorkoutMetricModel]
+
+    private let wrappedColumns = [
+        GridItem(.adaptive(minimum: 86), spacing: 12, alignment: .leading)
+    ]
+
+    var body: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(alignment: .top, spacing: 12) {
+                ForEach(metrics) { metric in
+                    WorkoutMetricView(metric: metric)
+                        .fixedSize(horizontal: true, vertical: false)
+                }
+            }
+
+            LazyVGrid(columns: wrappedColumns, alignment: .leading, spacing: 12) {
+                ForEach(metrics) { metric in
+                    WorkoutMetricView(metric: metric)
+                }
+            }
+        }
+    }
 }
 
 private struct WorkoutMetricView: View {

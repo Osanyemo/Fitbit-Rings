@@ -553,7 +553,8 @@ private extension DashboardSnapshot {
                 startTime: Date.now.addingTimeInterval(-7_200),
                 durationSeconds: 2_340,
                 distanceMeters: 3_120,
-                calories: 242
+                calories: 242,
+                averageHeartRate: 122
             ),
             heart: HeartSummary(
                 mostRecentHeartRate: 86,

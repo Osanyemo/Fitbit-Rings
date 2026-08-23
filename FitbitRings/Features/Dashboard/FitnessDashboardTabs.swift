@@ -1824,6 +1824,16 @@ private struct WorkoutRowCard: View {
             )
         }
 
+        if let heartRate = workout.metricsSummary.averageHeartRate {
+            stats.append(
+                WorkoutStat(
+                    id: "average-heart-rate",
+                    text: "\(DashboardFormatting.integer(heartRate)) bpm",
+                    systemImage: "heart.fill"
+                )
+            )
+        }
+
         return stats
     }
 
@@ -2434,7 +2444,8 @@ private extension FitnessDataSnapshot {
                 startTime: Date.now.addingTimeInterval(-7_200),
                 durationSeconds: 2_340,
                 distanceMeters: 3_120,
-                calories: 242
+                calories: 242,
+                averageHeartRate: 122
             ),
             heart: HeartSummary(
                 mostRecentHeartRate: 86,

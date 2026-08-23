@@ -342,7 +342,8 @@ struct WorkoutDetail: Codable, Equatable, Identifiable, Sendable {
             startTime: startTime,
             durationSeconds: durationSeconds,
             distanceMeters: metricsSummary.distanceMeters,
-            calories: metricsSummary.caloriesKcal
+            calories: metricsSummary.caloriesKcal,
+            averageHeartRate: metricsSummary.averageHeartRate
         )
     }
 }
@@ -444,6 +445,7 @@ struct FitnessDataSnapshot: Equatable, Sendable {
     var summary: DashboardSnapshot
     var activity: ActivityDashboardData
     var workouts: [WorkoutDetail]
+    var workoutsLoadedAt: Date?
     var health: HealthDashboardData
     var lastUpdated: Date
 
@@ -452,6 +454,7 @@ struct FitnessDataSnapshot: Equatable, Sendable {
         summary: DashboardSnapshot,
         activity: ActivityDashboardData = .empty,
         workouts: [WorkoutDetail] = [],
+        workoutsLoadedAt: Date? = nil,
         health: HealthDashboardData = .empty,
         lastUpdated: Date? = nil
     ) {
@@ -459,6 +462,7 @@ struct FitnessDataSnapshot: Equatable, Sendable {
         self.summary = summary
         self.activity = activity
         self.workouts = workouts.sorted { $0.startTime > $1.startTime }
+        self.workoutsLoadedAt = workoutsLoadedAt
         self.health = health
         self.lastUpdated = lastUpdated ?? summary.lastUpdated
     }
@@ -497,6 +501,7 @@ extension FitnessDataSnapshot {
         var summary: DashboardSnapshot.CodableSnapshot
         var activity: ActivityDashboardData
         var workouts: [WorkoutDetail]
+        var workoutsLoadedAt: Date?
         var health: HealthDashboardData
         var lastUpdated: Date
 
@@ -505,6 +510,7 @@ extension FitnessDataSnapshot {
             summary = DashboardSnapshot.CodableSnapshot(snapshot.summary)
             activity = snapshot.activity
             workouts = snapshot.workouts
+            workoutsLoadedAt = snapshot.workoutsLoadedAt
             health = snapshot.health
             lastUpdated = snapshot.lastUpdated
         }
@@ -515,6 +521,7 @@ extension FitnessDataSnapshot {
                 summary: summary.domainValue,
                 activity: activity,
                 workouts: workouts,
+                workoutsLoadedAt: workoutsLoadedAt,
                 health: health,
                 lastUpdated: lastUpdated
             )
@@ -535,7 +542,7 @@ extension WorkoutDetail {
                 distanceMeters: summary.distanceMeters,
                 steps: nil,
                 elevationGainMeters: nil,
-                averageHeartRate: nil,
+                averageHeartRate: summary.averageHeartRate,
                 maxHeartRate: nil,
                 averageSpeedMetersPerSecond: nil,
                 averagePaceSecondsPerKilometer: nil

@@ -251,6 +251,7 @@ extension DashboardSnapshot {
         var durationSeconds: TimeInterval
         var distanceMeters: Double?
         var calories: Double?
+        var averageHeartRate: Double?
 
         init(_ workout: WorkoutSummary) {
             type = workout.type
@@ -258,6 +259,7 @@ extension DashboardSnapshot {
             durationSeconds = workout.durationSeconds
             distanceMeters = workout.distanceMeters
             calories = workout.calories
+            averageHeartRate = workout.averageHeartRate
         }
 
         var domainValue: WorkoutSummary {
@@ -266,7 +268,8 @@ extension DashboardSnapshot {
                 startTime: startTime,
                 durationSeconds: durationSeconds,
                 distanceMeters: distanceMeters,
-                calories: calories
+                calories: calories,
+                averageHeartRate: averageHeartRate
             )
         }
     }

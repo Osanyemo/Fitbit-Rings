@@ -418,7 +418,9 @@ struct GoogleHealthMetricsSummary: Decodable {
         case steps
         case elevationGainMillimeters
         case averageHeartRate
+        case averageHeartRateBeatsPerMinute
         case maxHeartRate
+        case maxHeartRateBeatsPerMinute
         case averageSpeedMetersPerSecond
         case averagePaceSecondsPerKilometer
     }
@@ -450,7 +452,9 @@ struct GoogleHealthMetricsSummary: Decodable {
         steps = try container.decodeIfPresent(GoogleHealthNumericValue.self, forKey: .steps)
         elevationGainMillimeters = try container.decodeGoogleHealthDoubleIfPresent(forKey: .elevationGainMillimeters)
         averageHeartRate = try container.decodeIfPresent(GoogleHealthNumericValue.self, forKey: .averageHeartRate)
+            ?? container.decodeIfPresent(GoogleHealthNumericValue.self, forKey: .averageHeartRateBeatsPerMinute)
         maxHeartRate = try container.decodeIfPresent(GoogleHealthNumericValue.self, forKey: .maxHeartRate)
+            ?? container.decodeIfPresent(GoogleHealthNumericValue.self, forKey: .maxHeartRateBeatsPerMinute)
         averageSpeedMetersPerSecond = try container.decodeIfPresent(
             GoogleHealthNumericValue.self,
             forKey: .averageSpeedMetersPerSecond
@@ -472,6 +476,55 @@ struct GoogleHealthWorkoutSplit: Decodable {
     var speedMetersPerSecond: GoogleHealthNumericValue?
     var elevationGainMillimeters: Double?
     var averageHeartRate: GoogleHealthNumericValue?
+
+    private enum CodingKeys: String, CodingKey {
+        case name
+        case label
+        case distanceMillimeters
+        case duration
+        case durationSeconds
+        case paceSecondsPerKilometer
+        case speedMetersPerSecond
+        case elevationGainMillimeters
+        case averageHeartRate
+        case averageHeartRateBeatsPerMinute
+    }
+
+    init(
+        name: String? = nil,
+        label: String? = nil,
+        distanceMillimeters: Double? = nil,
+        duration: String? = nil,
+        durationSeconds: GoogleHealthNumericValue? = nil,
+        paceSecondsPerKilometer: GoogleHealthNumericValue? = nil,
+        speedMetersPerSecond: GoogleHealthNumericValue? = nil,
+        elevationGainMillimeters: Double? = nil,
+        averageHeartRate: GoogleHealthNumericValue? = nil
+    ) {
+        self.name = name
+        self.label = label
+        self.distanceMillimeters = distanceMillimeters
+        self.duration = duration
+        self.durationSeconds = durationSeconds
+        self.paceSecondsPerKilometer = paceSecondsPerKilometer
+        self.speedMetersPerSecond = speedMetersPerSecond
+        self.elevationGainMillimeters = elevationGainMillimeters
+        self.averageHeartRate = averageHeartRate
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        name = try container.decodeIfPresent(String.self, forKey: .name)
+        label = try container.decodeIfPresent(String.self, forKey: .label)
+        distanceMillimeters = try container.decodeGoogleHealthDoubleIfPresent(forKey: .distanceMillimeters)
+        duration = try container.decodeIfPresent(String.self, forKey: .duration)
+        durationSeconds = try container.decodeIfPresent(GoogleHealthNumericValue.self, forKey: .durationSeconds)
+        paceSecondsPerKilometer = try container.decodeIfPresent(GoogleHealthNumericValue.self, forKey: .paceSecondsPerKilometer)
+        speedMetersPerSecond = try container.decodeIfPresent(GoogleHealthNumericValue.self, forKey: .speedMetersPerSecond)
+        elevationGainMillimeters = try container.decodeGoogleHealthDoubleIfPresent(forKey: .elevationGainMillimeters)
+        averageHeartRate = try container.decodeIfPresent(GoogleHealthNumericValue.self, forKey: .averageHeartRate)
+            ?? container.decodeIfPresent(GoogleHealthNumericValue.self, forKey: .averageHeartRateBeatsPerMinute)
+    }
 }
 
 struct GoogleHealthWorkoutZoneMinutes: Decodable {

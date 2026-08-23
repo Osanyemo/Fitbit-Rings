@@ -681,7 +681,8 @@ final class GoogleHealthDecodingTests: XCTestCase {
                 "displayName": "Run",
                 "metricsSummary": {
                   "distanceMillimeters": 5000000.0,
-                  "caloriesKcal": 320.0
+                  "caloriesKcal": 320.0,
+                  "averageHeartRateBeatsPerMinute": "142"
                 }
               }
             }
@@ -708,6 +709,7 @@ final class GoogleHealthDecodingTests: XCTestCase {
         XCTAssertEqual(workout?.durationSeconds, 1_800)
         XCTAssertEqual(workout?.distanceMeters, 5_000)
         XCTAssertEqual(workout?.calories, 320)
+        XCTAssertEqual(workout?.averageHeartRate, 142)
     }
 
     func testDataPointResponseDecodesHeartAndSleepRecords() throws {

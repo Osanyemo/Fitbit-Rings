@@ -293,8 +293,8 @@ final class FitnessDashboardStore {
             states[.activity] = FitnessSectionState(phase: .loaded, lastUpdated: loadedAt, errorMessage: nil)
         }
 
-        if !snapshot.workouts.isEmpty {
-            states[.workouts] = FitnessSectionState(phase: .loaded, lastUpdated: snapshot.lastUpdated, errorMessage: nil)
+        if let workoutsLoadedAt = snapshot.workoutsLoadedAt {
+            states[.workouts] = FitnessSectionState(phase: .loaded, lastUpdated: workoutsLoadedAt, errorMessage: nil)
         }
 
         if let loadedAt = snapshot.health.loadedAt {
