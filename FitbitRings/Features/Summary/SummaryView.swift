@@ -155,9 +155,9 @@ private struct ActivityTopBand: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(18)
-        .background(Color.activityHeaderSurface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .background(Color.activityHeaderSurface, in: RoundedRectangle(cornerRadius: DashboardCardRadius.tile, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
+            RoundedRectangle(cornerRadius: DashboardCardRadius.tile, style: .continuous)
                 .stroke(.dashboardStroke, lineWidth: 1)
         }
     }
@@ -467,9 +467,9 @@ private struct SyncStatusBanner: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(14)
-        .background(background, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .background(background, in: RoundedRectangle(cornerRadius: DashboardCardRadius.compact, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
+            RoundedRectangle(cornerRadius: DashboardCardRadius.compact, style: .continuous)
                 .stroke(border, lineWidth: 1)
         }
         .transition(.opacity.combined(with: .move(edge: .top)))

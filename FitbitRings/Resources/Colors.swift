@@ -1,5 +1,10 @@
 import SwiftUI
 
+enum DashboardCardRadius {
+    static let tile: CGFloat = 32
+    static let compact: CGFloat = 20
+}
+
 extension ShapeStyle where Self == Color {
     static var moveRing: Color { Color(red: 1.00, green: 0.17, blue: 0.10) }
     static var activeRing: Color { Color(red: 0.42, green: 0.96, blue: 0.08) }

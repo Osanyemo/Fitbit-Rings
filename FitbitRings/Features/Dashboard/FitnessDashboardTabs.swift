@@ -492,9 +492,9 @@ private struct HealthOverviewCard: View {
         }
         .padding(14)
         .frame(maxWidth: .infinity, minHeight: 156, alignment: .topLeading)
-        .background(overviewBackground, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .background(overviewBackground, in: RoundedRectangle(cornerRadius: DashboardCardRadius.tile, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
+            RoundedRectangle(cornerRadius: DashboardCardRadius.tile, style: .continuous)
                 .stroke(item.accentColor.opacity(0.18), lineWidth: 1)
         }
         .accessibilityElement(children: .combine)
@@ -665,7 +665,7 @@ private struct SleepDetailView: View {
                                     .foregroundStyle(.secondary)
                             }
                             .padding(14)
-                            .background(.summarySurface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                            .background(.summarySurface, in: RoundedRectangle(cornerRadius: DashboardCardRadius.compact, style: .continuous))
                         }
                     }
                 }
@@ -1075,9 +1075,9 @@ private struct ActivityGoalTile: View {
         }
         .padding(14)
         .frame(maxWidth: .infinity, minHeight: 142, alignment: .topLeading)
-        .background(tileBackground, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .background(tileBackground, in: RoundedRectangle(cornerRadius: DashboardCardRadius.tile, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
+            RoundedRectangle(cornerRadius: DashboardCardRadius.tile, style: .continuous)
                 .stroke(tileBorder, lineWidth: 1)
         }
         .accessibilityElement(children: .combine)
@@ -1187,9 +1187,9 @@ struct DashboardMetricCard: View {
         }
         .padding(14)
         .frame(maxWidth: .infinity, minHeight: showsChartSlot ? 190 : 142, alignment: .topLeading)
-        .background(.summarySurface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .background(.summarySurface, in: RoundedRectangle(cornerRadius: DashboardCardRadius.tile, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
+            RoundedRectangle(cornerRadius: DashboardCardRadius.tile, style: .continuous)
                 .stroke(cardBorder, lineWidth: 1)
         }
     }
@@ -1422,9 +1422,9 @@ private struct BucketDistributionCard: View {
             }
         }
         .padding(16)
-        .background(.summarySurface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .background(.summarySurface, in: RoundedRectangle(cornerRadius: DashboardCardRadius.tile, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
+            RoundedRectangle(cornerRadius: DashboardCardRadius.tile, style: .continuous)
                 .stroke(.dashboardStroke, lineWidth: 1)
         }
     }
@@ -1468,9 +1468,9 @@ private struct BucketList: View {
             }
         }
         .padding(16)
-        .background(.summarySurface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .background(.summarySurface, in: RoundedRectangle(cornerRadius: DashboardCardRadius.compact, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
+            RoundedRectangle(cornerRadius: DashboardCardRadius.compact, style: .continuous)
                 .stroke(.dashboardStroke, lineWidth: 1)
         }
     }
@@ -1557,9 +1557,9 @@ private struct HealthSleepSessionCard: View {
         }
         .padding(15)
         .frame(maxWidth: .infinity, alignment: .topLeading)
-        .background(.summarySurface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .background(.summarySurface, in: RoundedRectangle(cornerRadius: DashboardCardRadius.tile, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
+            RoundedRectangle(cornerRadius: DashboardCardRadius.tile, style: .continuous)
                 .stroke(Color.sleepAccent.opacity(0.18), lineWidth: 1)
         }
         .accessibilityElement(children: .combine)
@@ -1780,9 +1780,9 @@ private struct WorkoutRowCard: View {
         }
         .padding(15)
         .frame(maxWidth: .infinity, minHeight: 148, alignment: .topLeading)
-        .background(.summarySurface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .background(.summarySurface, in: RoundedRectangle(cornerRadius: DashboardCardRadius.tile, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
+            RoundedRectangle(cornerRadius: DashboardCardRadius.tile, style: .continuous)
                 .stroke(cardBorder, lineWidth: 1)
         }
     }
@@ -1942,7 +1942,7 @@ private struct WorkoutSplitsSection: View {
                 }
                 .padding(14)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(.summarySurface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .background(.summarySurface, in: RoundedRectangle(cornerRadius: DashboardCardRadius.compact, style: .continuous))
             }
         }
     }
@@ -1990,7 +1990,7 @@ private struct MetricPointRow: View {
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.summarySurface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .background(.summarySurface, in: RoundedRectangle(cornerRadius: DashboardCardRadius.compact, style: .continuous))
     }
 
     private var dateText: some View {
@@ -2105,9 +2105,9 @@ private struct DashboardEmptyState: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(16)
-        .background(.summarySurface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .background(.summarySurface, in: RoundedRectangle(cornerRadius: DashboardCardRadius.compact, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
+            RoundedRectangle(cornerRadius: DashboardCardRadius.compact, style: .continuous)
                 .stroke(.dashboardStroke, lineWidth: 1)
         }
     }

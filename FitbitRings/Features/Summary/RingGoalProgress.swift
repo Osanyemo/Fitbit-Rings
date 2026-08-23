@@ -53,9 +53,9 @@ private struct ProgressRow: View {
                 .animation(progressAnimation, value: metric.cappedProgress)
         }
         .padding(12)
-        .background(.dashboardMetricSurface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .background(.dashboardMetricSurface, in: RoundedRectangle(cornerRadius: DashboardCardRadius.compact, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
+            RoundedRectangle(cornerRadius: DashboardCardRadius.compact, style: .continuous)
                 .stroke(color.opacity(0.10), lineWidth: 1)
         }
         .accessibilityElement(children: .combine)

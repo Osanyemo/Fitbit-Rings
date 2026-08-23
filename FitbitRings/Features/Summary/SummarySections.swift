@@ -228,9 +228,9 @@ struct RecentWorkoutSection: View {
                 }
                 .padding(15)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(.summarySurface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .background(.summarySurface, in: RoundedRectangle(cornerRadius: DashboardCardRadius.tile, style: .continuous))
                 .overlay {
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    RoundedRectangle(cornerRadius: DashboardCardRadius.tile, style: .continuous)
                         .stroke(workoutBorder, lineWidth: 1)
                 }
                 .accessibilityElement(children: .combine)
@@ -373,9 +373,9 @@ private struct FitnessGoalCard: View {
         }
         .padding(15)
         .frame(maxWidth: .infinity, minHeight: 154, alignment: .topLeading)
-        .background(cardBackground, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .background(cardBackground, in: RoundedRectangle(cornerRadius: DashboardCardRadius.tile, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
+            RoundedRectangle(cornerRadius: DashboardCardRadius.tile, style: .continuous)
                 .stroke(cardBorder, lineWidth: 1)
         }
         .accessibilityElement(children: .combine)
