@@ -220,7 +220,29 @@ struct RecentWorkoutSection: View {
                         }
                     }
 
-                    WorkoutMetricsRow(metrics: workoutMetrics)
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack(alignment: .lastTextBaseline, spacing: 4) {
+                            Text(duration.value)
+                                .font(.system(size: 34, weight: .bold, design: .rounded))
+                                .monospacedDigit()
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.50)
+                                .allowsTightening(true)
+                                .layoutPriority(1)
+
+                            if !duration.unit.isEmpty {
+                                Text(duration.unit)
+                                    .font(.headline.weight(.semibold))
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.64)
+                            }
+                        }
+
+                        if !workoutStats.isEmpty {
+                            RecentWorkoutStatsRow(stats: workoutStats)
+                        }
+                    }
                 }
                 .padding(15)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -237,52 +259,44 @@ struct RecentWorkoutSection: View {
         }
     }
 
-    private var workoutMetrics: [WorkoutMetricModel] {
-        var metrics = [
-            WorkoutMetricModel(
-                title: "Duration",
-                value: DashboardFormatting.durationParts(workout.durationSeconds),
-                systemImage: "stopwatch"
-            )
-        ]
+    private var duration: DashboardFormatting.MetricValue {
+        DashboardFormatting.durationParts(workout.durationSeconds)
+    }
+
+    private var workoutStats: [RecentWorkoutStat] {
+        var stats: [RecentWorkoutStat] = []
 
         if let distance = workout.distanceMeters {
-            metrics.append(
-                WorkoutMetricModel(
-                    title: "Distance",
-                    value: DashboardFormatting.distanceParts(distance, unit: units.distanceUnit),
+            stats.append(
+                RecentWorkoutStat(
+                    id: "distance",
+                    text: DashboardFormatting.distance(distance, unit: units.distanceUnit),
                     systemImage: "map"
                 )
             )
         }
 
         if let calories = workout.calories {
-            metrics.append(
-                WorkoutMetricModel(
-                    title: "Calories Burned",
-                    value: DashboardFormatting.MetricValue(
-                        value: DashboardFormatting.integer(calories),
-                        unit: "kcal"
-                    ),
-                    systemImage: "bolt.fill"
+            stats.append(
+                RecentWorkoutStat(
+                    id: "calories",
+                    text: "\(DashboardFormatting.integer(calories)) kcal",
+                    systemImage: "flame"
                 )
             )
         }
 
         if let heartRate = workout.averageHeartRate {
-            metrics.append(
-                WorkoutMetricModel(
-                    title: "Avg Heart",
-                    value: DashboardFormatting.MetricValue(
-                        value: DashboardFormatting.integer(heartRate),
-                        unit: "bpm"
-                    ),
+            stats.append(
+                RecentWorkoutStat(
+                    id: "average-heart-rate",
+                    text: "\(DashboardFormatting.integer(heartRate)) bpm",
                     systemImage: "heart.fill"
                 )
             )
         }
 
-        return metrics
+        return stats
     }
 
     private var workoutBorder: Color {
@@ -484,84 +498,37 @@ private struct FitnessProgressBar: View {
     }
 }
 
-private struct WorkoutMetricModel: Identifiable {
-    var id: String { title }
-    let title: String
-    let value: DashboardFormatting.MetricValue
+private struct RecentWorkoutStat: Identifiable {
+    let id: String
+    let text: String
     let systemImage: String
 }
 
-private struct WorkoutMetricsRow: View {
-    let metrics: [WorkoutMetricModel]
-
-    private let wrappedColumns = [
-        GridItem(.adaptive(minimum: 86), spacing: 12, alignment: .leading)
-    ]
+private struct RecentWorkoutStatsRow: View {
+    let stats: [RecentWorkoutStat]
 
     var body: some View {
-        ViewThatFits(in: .horizontal) {
-            HStack(alignment: .top, spacing: 12) {
-                ForEach(metrics) { metric in
-                    WorkoutMetricView(metric: metric)
-                        .fixedSize(horizontal: true, vertical: false)
-                }
-            }
-
-            LazyVGrid(columns: wrappedColumns, alignment: .leading, spacing: 12) {
-                ForEach(metrics) { metric in
-                    WorkoutMetricView(metric: metric)
-                }
+        HStack(alignment: .firstTextBaseline, spacing: 18) {
+            ForEach(stats) { stat in
+                RecentWorkoutStatLabel(stat: stat)
+                    .layoutPriority(1)
             }
         }
+        .font(.caption.weight(.semibold))
+        .foregroundStyle(.secondary)
+        .minimumScaleFactor(0.68)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
-private struct WorkoutMetricView: View {
-    let metric: WorkoutMetricModel
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+private struct RecentWorkoutStatLabel: View {
+    let stat: RecentWorkoutStat
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 7) {
-            HStack(spacing: 6) {
-                Image(systemName: metric.systemImage)
-                    .font(.caption.weight(.bold))
-                    .foregroundStyle(.tertiary)
-                    .frame(width: 15)
-
-                Text(metric.title)
-                    .font(.caption.weight(.bold))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.76)
-            }
-
-            HStack(alignment: .lastTextBaseline, spacing: 3) {
-                Text(metric.value.value)
-                    .font(.system(size: 28, weight: .bold, design: .rounded))
-                    .monospacedDigit()
-                    .contentTransition(.numericText())
-                    .animation(valueAnimation, value: metric.value.value)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.58)
-                    .allowsTightening(true)
-
-                if !metric.value.unit.isEmpty {
-                    Text(metric.value.unit)
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.7)
-                        .allowsTightening(true)
-                }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .accessibilityLabel("\(metric.title) \(metric.value.value) \(metric.value.unit)")
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    private var valueAnimation: Animation? {
-        reduceMotion ? nil : .smooth(duration: 0.24, extraBounce: 0)
+        Label(stat.text, systemImage: stat.systemImage)
+            .lineLimit(1)
+            .minimumScaleFactor(0.68)
+            .allowsTightening(true)
     }
 }
 
