@@ -354,7 +354,7 @@ extension GoogleHealthDataType {
         case .distance:
             return "map.fill"
         case .totalCalories:
-            return "fork.knife"
+            return "flame.circle.fill"
         case .activeZoneMinutes, .caloriesInHeartRateZone, .timeInHeartRateZone:
             return "bolt.heart.fill"
         case .floors:

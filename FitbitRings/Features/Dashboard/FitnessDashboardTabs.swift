@@ -2305,7 +2305,7 @@ private extension WorkoutDetail {
 
         if let calories = metricsSummary.caloriesKcal {
             metrics.append(
-                DetailMetric(title: "Calories", value: DashboardFormatting.integer(calories), unit: "kcal", systemImage: "flame", color: .moveRing)
+                DetailMetric(title: "Calories Burned", value: DashboardFormatting.integer(calories), unit: "kcal", systemImage: "flame", color: .moveRing)
             )
         }
 

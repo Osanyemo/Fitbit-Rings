@@ -102,14 +102,14 @@ struct TodayGoalsSection: View {
                 isAvailable: snapshot.activity.hasData(for: .distance)
             ),
             FitnessGoalCardModel(
-                title: "Calories",
+                title: "Total Calories",
                 value: valueText(
                     type: .totalCalories,
                     value: DashboardFormatting.integer(snapshot.activity.totalCalories)
                 ),
                 unit: unitText(type: .totalCalories, unit: "kcal"),
                 subtitle: summaryDayLabel,
-                systemImage: "fork.knife",
+                systemImage: "flame.circle.fill",
                 accentColor: .calorieAccent,
                 dataType: .totalCalories,
                 isAvailable: snapshot.activity.hasData(for: .totalCalories)
@@ -263,7 +263,7 @@ struct RecentWorkoutSection: View {
         if let calories = workout.calories {
             metrics.append(
                 WorkoutMetricModel(
-                    title: "Calories",
+                    title: "Calories Burned",
                     value: DashboardFormatting.MetricValue(
                         value: DashboardFormatting.integer(calories),
                         unit: "kcal"
