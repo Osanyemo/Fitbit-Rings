@@ -6,9 +6,59 @@ import XCTest
 final class DashboardTests: XCTestCase {
     func testRingProgressCapsAtOneForRendering() {
         let metric = RingMetric(title: "Steps", value: 12_500, goal: 10_000, unit: "")
+        let nonFiniteMetric = RingMetric(title: "Steps", value: .infinity, goal: 10_000, unit: "")
 
         XCTAssertEqual(metric.progress, 1.25)
         XCTAssertEqual(metric.cappedProgress, 1)
+        XCTAssertEqual(nonFiniteMetric.cappedProgress, 0)
+    }
+
+    func testActivityRingGeometryHidesHeadAtZeroProgress() {
+        XCTAssertEqual(ActivityRingGeometry.endpointAngle(for: 0).degrees, -90, accuracy: 0.001)
+        XCTAssertFalse(ActivityRingGeometry.showsProgressHead(for: 0))
+        XCTAssertFalse(ActivityRingGeometry.showsProgressHead(for: -0.1))
+        XCTAssertFalse(ActivityRingGeometry.showsProgressHead(for: .nan))
+        XCTAssertTrue(ActivityRingGeometry.showsProgressHead(for: 0.001))
+    }
+
+    func testActivityRingGeometryMapsProgressEndpointsToQuadrants() {
+        let center = CGPoint(x: 100, y: 100)
+        let radius: CGFloat = 50
+
+        assertPoint(
+            ActivityRingGeometry.endpoint(center: center, radius: radius, progress: 0),
+            equals: CGPoint(x: 100, y: 50)
+        )
+        assertPoint(
+            ActivityRingGeometry.endpoint(center: center, radius: radius, progress: 0.25),
+            equals: CGPoint(x: 150, y: 100)
+        )
+        assertPoint(
+            ActivityRingGeometry.endpoint(center: center, radius: radius, progress: 0.5),
+            equals: CGPoint(x: 100, y: 150)
+        )
+        assertPoint(
+            ActivityRingGeometry.endpoint(center: center, radius: radius, progress: 0.75),
+            equals: CGPoint(x: 50, y: 100)
+        )
+        assertPoint(
+            ActivityRingGeometry.endpoint(center: center, radius: radius, progress: 1),
+            equals: CGPoint(x: 100, y: 50)
+        )
+    }
+
+    func testActivityRingGeometryClampsRenderingProgress() {
+        XCTAssertEqual(ActivityRingGeometry.clampedProgress(-0.2), 0)
+        XCTAssertEqual(ActivityRingGeometry.clampedProgress(.nan), 0)
+        XCTAssertEqual(ActivityRingGeometry.clampedProgress(.infinity), 0)
+        XCTAssertEqual(ActivityRingGeometry.clampedProgress(1.4), 1)
+        XCTAssertEqual(ActivityRingGeometry.renderedProgress(for: 0), 0)
+        XCTAssertEqual(ActivityRingGeometry.renderedProgress(for: 1.4), 1)
+        XCTAssertGreaterThan(ActivityRingGeometry.renderedProgress(for: 0.001), 0.001)
+        XCTAssertEqual(
+            ActivityRingGeometry.renderedProgress(for: 0.001),
+            ActivityRingGeometry.minimumVisibleProgress
+        )
     }
 
     func testDistanceFormattingUsesSelectedUnit() {
@@ -1272,6 +1322,17 @@ private func utcCalendar() -> Calendar {
     var calendar = Calendar(identifier: .gregorian)
     calendar.timeZone = TimeZone(secondsFromGMT: 0)!
     return calendar
+}
+
+private func assertPoint(
+    _ actual: CGPoint,
+    equals expected: CGPoint,
+    accuracy: CGFloat = 0.001,
+    file: StaticString = #filePath,
+    line: UInt = #line
+) {
+    XCTAssertEqual(actual.x, expected.x, accuracy: accuracy, file: file, line: line)
+    XCTAssertEqual(actual.y, expected.y, accuracy: accuracy, file: file, line: line)
 }
 
 private func date(

@@ -47,7 +47,8 @@ struct RingMetric: Identifiable, Equatable, Sendable {
     }
 
     var cappedProgress: Double {
-        min(progress, 1)
+        guard progress.isFinite else { return 0 }
+        return min(max(progress, 0), 1)
     }
 }
 

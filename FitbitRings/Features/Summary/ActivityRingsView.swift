@@ -13,16 +13,33 @@ struct ActivityRingsView: View {
             let ringSpacing = lineWidth * 1.55
 
             ZStack {
-                ring(metric: rings.steps, color: .stepsRing, inset: 0, lineWidth: lineWidth)
-                ring(metric: rings.active, color: .activeRing, inset: ringSpacing, lineWidth: lineWidth)
-                ring(metric: rings.move, color: .moveRing, inset: ringSpacing * 2, lineWidth: lineWidth)
+                ring(
+                    metric: rings.steps,
+                    color: .stepsRing,
+                    inset: 0,
+                    lineWidth: lineWidth,
+                    size: size,
+                    systemImage: "arrow.up"
+                )
+                ring(
+                    metric: rings.active,
+                    color: .activeRing,
+                    inset: ringSpacing,
+                    lineWidth: lineWidth,
+                    size: size,
+                    systemImage: "chevron.right.2"
+                )
+                ring(
+                    metric: rings.move,
+                    color: .moveRing,
+                    inset: ringSpacing * 2,
+                    lineWidth: lineWidth,
+                    size: size,
+                    systemImage: "arrow.right"
+                )
 
                 if showsCenterSummary {
                     centerSummary
-                }
-
-                if showsRingBadges {
-                    ringBadges(size: size, lineWidth: lineWidth, ringSpacing: ringSpacing)
                 }
             }
             .frame(width: size, height: size)
@@ -61,45 +78,107 @@ struct ActivityRingsView: View {
         .padding(.horizontal, 28)
     }
 
-    private func ring(metric: RingMetric, color: Color, inset: CGFloat, lineWidth: CGFloat) -> some View {
-        ZStack {
+    private func ring(
+        metric: RingMetric,
+        color: Color,
+        inset: CGFloat,
+        lineWidth: CGFloat,
+        size: CGFloat,
+        systemImage: String
+    ) -> some View {
+        let progress = metric.cappedProgress
+        let ringPadding = inset + lineWidth / 2
+        let headPosition = ActivityRingGeometry.endpoint(
+            center: CGPoint(x: size / 2, y: size / 2),
+            radius: ActivityRingGeometry.radius(size: size, inset: inset, lineWidth: lineWidth),
+            progress: progress
+        )
+
+        return ZStack {
             RingShape(progress: 1)
-                .stroke(color.opacity(0.14), style: stroke(lineWidth: lineWidth))
-            RingShape(progress: metric.cappedProgress)
+                .stroke(Color.black.opacity(0.20), style: stroke(lineWidth: lineWidth + 3))
+                .shadow(color: Color.black.opacity(0.12), radius: 1, x: 0, y: 1)
+                .padding(ringPadding)
+            RingShape(progress: 1)
+                .stroke(color.opacity(0.13), style: stroke(lineWidth: lineWidth))
+                .padding(ringPadding)
+            RingShape(progress: 1)
+                .stroke(trackHighlight, style: stroke(lineWidth: lineWidth * 0.58))
+                .blendMode(.screen)
+                .padding(ringPadding)
+            RingShape(progress: progress)
                 .stroke(
                     AngularGradient(
-                        colors: [color.opacity(0.68), color],
+                        colors: [
+                            color.opacity(0.72),
+                            color,
+                            color.opacity(0.92)
+                        ],
                         center: .center,
-                        startAngle: .degrees(-90),
-                        endAngle: .degrees(270)
+                        startAngle: ActivityRingGeometry.startAngle,
+                        endAngle: .degrees(ActivityRingGeometry.startAngle.degrees + 360)
                     ),
                     style: stroke(lineWidth: lineWidth)
                 )
-                .shadow(color: color.opacity(0.20), radius: 7, x: 0, y: 3)
-        }
-        .padding(inset + lineWidth / 2)
-        .drawingGroup(opaque: false, colorMode: .linear)
-        .animation(progressAnimation, value: metric.cappedProgress)
-    }
+                .shadow(color: color.opacity(0.34), radius: lineWidth * 0.34, x: 0, y: lineWidth * 0.12)
+                .shadow(color: color.opacity(0.18), radius: lineWidth * 0.16, x: 0, y: 0)
+                .padding(ringPadding)
 
-    private func ringBadges(size: CGFloat, lineWidth: CGFloat, ringSpacing: CGFloat) -> some View {
-        ZStack {
-            ringBadge(systemImage: "arrow.up", color: .stepsRing, lineWidth: lineWidth)
-                .position(x: size / 2, y: lineWidth / 2)
-            ringBadge(systemImage: "chevron.right.2", color: .activeRing, lineWidth: lineWidth)
-                .position(x: size / 2, y: ringSpacing + lineWidth / 2)
-            ringBadge(systemImage: "arrow.right", color: .moveRing, lineWidth: lineWidth)
-                .position(x: size / 2, y: ringSpacing * 2 + lineWidth / 2)
+            if showsRingBadges, ActivityRingGeometry.showsProgressHead(for: progress) {
+                ringHead(systemImage: systemImage, color: color, lineWidth: lineWidth)
+                    .position(headPosition)
+                    .transition(.scale(scale: 0.74).combined(with: .opacity))
+            }
         }
         .frame(width: size, height: size)
+        .drawingGroup(opaque: false, colorMode: .linear)
+        .animation(progressAnimation, value: progress)
     }
 
-    private func ringBadge(systemImage: String, color: Color, lineWidth: CGFloat) -> some View {
-        Image(systemName: systemImage)
-            .font(.system(size: lineWidth * 0.68, weight: .heavy, design: .rounded))
-            .foregroundStyle(Color.black.opacity(0.82))
-            .frame(width: lineWidth * 1.35, height: lineWidth * 1.35)
-            .background(color, in: Circle())
+    private var trackHighlight: LinearGradient {
+        LinearGradient(
+            colors: [
+                Color.white.opacity(0.18),
+                Color.white.opacity(0.02),
+                Color.black.opacity(0.18)
+            ],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+    }
+
+    private func ringHead(systemImage: String, color: Color, lineWidth: CGFloat) -> some View {
+        ZStack {
+            Circle()
+                .fill(color)
+            Circle()
+                .fill(headHighlight)
+                .blendMode(.screen)
+            Image(systemName: systemImage)
+                .font(.system(size: lineWidth * 0.58, weight: .black, design: .rounded))
+                .symbolRenderingMode(.monochrome)
+                .foregroundStyle(Color.black.opacity(0.82))
+        }
+        .frame(width: lineWidth * 1.42, height: lineWidth * 1.42)
+        .overlay {
+            Circle()
+                .stroke(Color.white.opacity(0.28), lineWidth: 1)
+        }
+        .shadow(color: color.opacity(0.38), radius: lineWidth * 0.28, x: 0, y: lineWidth * 0.11)
+        .shadow(color: Color.black.opacity(0.24), radius: lineWidth * 0.12, x: 0, y: lineWidth * 0.08)
+        .accessibilityHidden(true)
+    }
+
+    private var headHighlight: LinearGradient {
+        LinearGradient(
+            colors: [
+                Color.white.opacity(0.38),
+                Color.white.opacity(0.06),
+                Color.black.opacity(0.16)
+            ],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
     }
 
     private func ringLineWidth(for size: CGFloat) -> CGFloat {
@@ -128,8 +207,8 @@ struct RingShape: Shape {
         let size = min(rect.width, rect.height)
         let radius = size / 2
         let center = CGPoint(x: rect.midX, y: rect.midY)
-        let startAngle = Angle.degrees(-92)
-        let endAngle = Angle.degrees(-92 + 360 * progress)
+        let startAngle = ActivityRingGeometry.startAngle
+        let endAngle = ActivityRingGeometry.endpointAngle(for: progress)
 
         path.addArc(
             center: center,
@@ -139,5 +218,41 @@ struct RingShape: Shape {
             clockwise: false
         )
         return path
+    }
+}
+
+enum ActivityRingGeometry {
+    static let startAngle = Angle.degrees(-90)
+    static let minimumVisibleProgress = 0.018
+
+    static func clampedProgress(_ progress: Double) -> Double {
+        guard progress.isFinite else { return 0 }
+        return min(max(progress, 0), 1)
+    }
+
+    static func renderedProgress(for progress: Double) -> Double {
+        let clamped = clampedProgress(progress)
+        guard clamped > 0 else { return 0 }
+        return max(clamped, minimumVisibleProgress)
+    }
+
+    static func showsProgressHead(for progress: Double) -> Bool {
+        clampedProgress(progress) > 0
+    }
+
+    static func endpointAngle(for progress: Double) -> Angle {
+        .degrees(startAngle.degrees + 360 * renderedProgress(for: progress))
+    }
+
+    static func radius(size: CGFloat, inset: CGFloat, lineWidth: CGFloat) -> CGFloat {
+        max(0, size / 2 - inset - lineWidth / 2)
+    }
+
+    static func endpoint(center: CGPoint, radius: CGFloat, progress: Double) -> CGPoint {
+        let angle = endpointAngle(for: progress).radians
+        return CGPoint(
+            x: center.x + radius * CGFloat(cos(angle)),
+            y: center.y + radius * CGFloat(sin(angle))
+        )
     }
 }
