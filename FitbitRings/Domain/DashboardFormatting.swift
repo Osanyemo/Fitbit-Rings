@@ -17,6 +17,20 @@ enum DashboardFormatting {
         integer.string(from: NSNumber(value: value.rounded())) ?? "\(Int(value.rounded()))"
     }
 
+    static func decimal(
+        _ value: Double,
+        minimumFractionDigits: Int = 0,
+        maximumFractionDigits: Int,
+        locale: Locale = .current
+    ) -> String {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        formatter.locale = locale
+        formatter.minimumFractionDigits = minimumFractionDigits
+        formatter.maximumFractionDigits = maximumFractionDigits
+        return formatter.string(from: NSNumber(value: value)) ?? "\(value)"
+    }
+
     static func distance(_ meters: Double, unit: DistanceUnit) -> String {
         let parts = distanceParts(meters, unit: unit)
         return "\(parts.value) \(parts.unit)"
@@ -25,9 +39,15 @@ enum DashboardFormatting {
     static func distanceParts(_ meters: Double, unit: DistanceUnit) -> MetricValue {
         switch unit {
         case .kilometers:
-            return MetricValue(value: String(format: "%.2f", meters / 1_000), unit: "km")
+            return MetricValue(
+                value: decimal(meters / 1_000, minimumFractionDigits: 2, maximumFractionDigits: 2),
+                unit: "km"
+            )
         case .miles:
-            return MetricValue(value: String(format: "%.2f", meters / 1_609.344), unit: "mi")
+            return MetricValue(
+                value: decimal(meters / 1_609.344, minimumFractionDigits: 2, maximumFractionDigits: 2),
+                unit: "mi"
+            )
         }
     }
 
@@ -50,9 +70,7 @@ enum DashboardFormatting {
 
     static func percent(_ progress: Double) -> String {
         guard progress.isFinite else { return "0%" }
-
-        let roundedPercent = Int((max(0, progress) * 100).rounded())
-        return "\(roundedPercent)%"
+        return max(0, progress).formatted(.percent.precision(.fractionLength(0)))
     }
 
     static func time(_ date: Date?) -> String {
@@ -216,12 +234,12 @@ enum DashboardFormatting {
         let formatter = DateFormatter()
         formatter.calendar = calendar
         formatter.timeZone = calendar.timeZone
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        if calendar.isDate(date, equalTo: now, toGranularity: .year) {
-            formatter.dateFormat = "MMM d"
-        } else {
-            formatter.dateFormat = "MMM d, yyyy"
-        }
+        formatter.locale = .current
+        formatter.setLocalizedDateFormatFromTemplate(
+            calendar.isDate(date, equalTo: now, toGranularity: .year)
+                ? "MMMd"
+                : "MMMdy"
+        )
         return formatter.string(from: date)
     }
 
@@ -229,8 +247,9 @@ enum DashboardFormatting {
         let formatter = DateFormatter()
         formatter.calendar = calendar
         formatter.timeZone = calendar.timeZone
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.dateFormat = "h:mm a"
+        formatter.locale = .current
+        formatter.timeStyle = .short
+        formatter.dateStyle = .none
         return formatter.string(from: date)
     }
 

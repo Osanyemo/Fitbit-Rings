@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import UIKit
 
 @MainActor
 @Observable
@@ -18,6 +19,7 @@ final class FitnessDashboardStore {
     var workoutPath: [DashboardRoute] = []
     var healthPath: [DashboardRoute] = []
     var errorMessage: String?
+    var automaticallyRefreshes = true
 
     init(repository: DashboardRepository, cache: DashboardCaching, staleAfter: TimeInterval = 300) {
         let cachedPreferences = cache.loadPreferences()
@@ -48,6 +50,7 @@ final class FitnessDashboardStore {
     }
 
     func refreshSummaryIfStale(now: Date = .now) async {
+        guard automaticallyRefreshes else { return }
         guard now.timeIntervalSince(snapshot.summary.lastUpdated) > staleAfter else {
             return
         }
@@ -55,6 +58,7 @@ final class FitnessDashboardStore {
     }
 
     func loadSelectedTabIfNeeded() async {
+        guard automaticallyRefreshes else { return }
         guard selectedTab.section != .summary else {
             return
         }
@@ -63,6 +67,7 @@ final class FitnessDashboardStore {
     }
 
     func loadIfNeeded(_ section: FitnessDashboardSection) async {
+        guard automaticallyRefreshes else { return }
         guard section != .summary else {
             await refreshSummaryIfStale()
             return
@@ -77,7 +82,7 @@ final class FitnessDashboardStore {
         await refreshSection(section)
     }
 
-    func refreshSummary() async {
+    func refreshSummary(announcesResult: Bool = false) async {
         guard beginRefresh(.summary) else { return }
         defer { finishRefresh(.summary) }
 
@@ -90,6 +95,7 @@ final class FitnessDashboardStore {
             snapshot = try await repository.refreshSummary(preserving: snapshot)
             snapshot.summary.syncState = .idle
             setSection(.summary, phase: .loaded, lastUpdated: snapshot.summary.lastUpdated, error: nil)
+            announceIfRequested("Summary updated", when: announcesResult)
         } catch {
             guard !error.isCancellation else {
                 snapshot.summary.syncState = .idle
@@ -99,14 +105,16 @@ final class FitnessDashboardStore {
             }
 
             snapshot.summary.syncState = .failed
-            errorMessage = error.localizedDescription
-            setSection(.summary, phase: .failed, lastUpdated: snapshot.summary.lastUpdated, error: error.localizedDescription)
+            let message = presentationMessage(for: error)
+            errorMessage = message
+            setSection(.summary, phase: .failed, lastUpdated: snapshot.summary.lastUpdated, error: message)
+            announceIfRequested("Summary could not be updated. \(message)", when: announcesResult)
         }
     }
 
-    func refreshSection(_ section: FitnessDashboardSection) async {
+    func refreshSection(_ section: FitnessDashboardSection, announcesResult: Bool = false) async {
         guard section != .summary else {
-            await refreshSummary()
+            await refreshSummary(announcesResult: announcesResult)
             return
         }
         guard beginRefresh(section) else { return }
@@ -128,12 +136,15 @@ final class FitnessDashboardStore {
                 snapshot = try await repository.refreshHealth(preserving: snapshot)
                 setSection(.health, phase: .loaded, lastUpdated: snapshot.health.loadedAt ?? .now, error: nil)
             }
+            announceIfRequested("\(section.spokenTitle) updated", when: announcesResult)
         } catch {
             guard !error.isCancellation else {
                 setSection(section, phase: .idle, error: nil)
                 return
             }
-            setSection(section, phase: .failed, error: error.localizedDescription)
+            let message = presentationMessage(for: error)
+            setSection(section, phase: .failed, error: message)
+            announceIfRequested("\(section.spokenTitle) could not be updated. \(message)", when: announcesResult)
         }
     }
 
@@ -157,7 +168,7 @@ final class FitnessDashboardStore {
                 setSection(section, phase: .idle, error: nil)
                 return
             }
-            setSection(section, phase: .failed, error: error.localizedDescription)
+            setSection(section, phase: .failed, error: presentationMessage(for: error))
         }
     }
 
@@ -192,7 +203,7 @@ final class FitnessDashboardStore {
                 setSection(.activity, phase: .idle, error: nil)
                 return
             }
-            setSection(.activity, phase: .failed, error: error.localizedDescription)
+            setSection(.activity, phase: .failed, error: presentationMessage(for: error))
         }
     }
 
@@ -332,6 +343,26 @@ final class FitnessDashboardStore {
         )
     }
 
+    private func presentationMessage(for error: Error) -> String {
+        if let urlError = error as? URLError {
+            switch urlError.code {
+            case .notConnectedToInternet, .networkConnectionLost:
+                return "Check your internet connection, then try again."
+            case .timedOut:
+                return "Google Health took too long to respond. Please try again."
+            default:
+                break
+            }
+        }
+
+        return "Google Health couldn’t complete the request. Please try again."
+    }
+
+    private func announceIfRequested(_ message: String, when requested: Bool) {
+        guard requested else { return }
+        UIAccessibility.post(notification: .announcement, argument: message)
+    }
+
     private func targetTab(for route: DashboardRoute) -> FitnessDashboardTab {
         switch route.kind {
         case .workout:
@@ -381,6 +412,21 @@ final class FitnessDashboardStore {
         }
 
         return states
+    }
+}
+
+private extension FitnessDashboardSection {
+    var spokenTitle: String {
+        switch self {
+        case .summary:
+            return "Summary"
+        case .activity:
+            return "Activity"
+        case .workouts:
+            return "Workouts"
+        case .health:
+            return "Health"
+        }
     }
 }
 

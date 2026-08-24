@@ -7,28 +7,29 @@ struct TodayGoalsSection: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var isExpanded = true
 
-    private let columns = [
-        GridItem(.flexible(), spacing: 12),
-        GridItem(.flexible(), spacing: 12)
-    ]
-
+    @ViewBuilder
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            DashboardSectionHeader(title: "Summary") {
+        if !goalCards.isEmpty {
+            VStack(alignment: .leading, spacing: 14) {
+            DashboardSectionHeader(title: "Today’s Metrics") {
                 Button {
                     withAnimation(sectionAnimation) {
                         isExpanded.toggle()
                     }
                 } label: {
-                    Text(isExpanded ? "Collapse" : "Expand")
-                        .font(.headline.weight(.semibold))
+                    Label(
+                        isExpanded ? "Collapse" : "Expand",
+                        systemImage: isExpanded ? "chevron.up" : "chevron.down"
+                    )
+                    .font(.subheadline.weight(.semibold))
+                    .frame(minHeight: DashboardDesign.minimumControlSize)
                 }
                 .buttonStyle(DashboardPillButtonStyle())
                 .accessibilityLabel(isExpanded ? "Collapse summary" : "Expand summary")
             }
 
             if isExpanded {
-                LazyVGrid(columns: columns, spacing: 12) {
+                DashboardAdaptiveGrid {
                     ForEach(goalCards) { card in
                         Button {
                             onMetricSelected(card.dataType)
@@ -42,73 +43,11 @@ struct TodayGoalsSection: View {
                 .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
+        }
     }
 
     private var goalCards: [FitnessGoalCardModel] {
-        let distance = DashboardFormatting.distanceParts(snapshot.activity.distanceMeters, unit: units.distanceUnit)
-        var cards: [FitnessGoalCardModel] = [
-            FitnessGoalCardModel(
-                title: "Steps",
-                value: valueText(
-                    type: .steps,
-                    value: DashboardFormatting.integer(Double(snapshot.activity.steps))
-                ),
-                progress: progressValue(type: .steps, progress: snapshot.rings.steps.progress),
-                systemImage: "shoeprints.fill",
-                accentColor: .stepsRing,
-                dataType: .steps,
-                isAvailable: snapshot.activity.hasData(for: .steps)
-            ),
-            FitnessGoalCardModel(
-                title: "Exercise Minutes",
-                value: valueText(
-                    type: .activeMinutes,
-                    value: DashboardFormatting.integer(snapshot.rings.active.value)
-                ),
-                unit: unitText(type: .activeMinutes, unit: "m"),
-                progress: progressValue(type: .activeMinutes, progress: snapshot.rings.active.progress),
-                systemImage: "figure.run",
-                accentColor: .activeRing,
-                dataType: .activeMinutes,
-                isHighlighted: snapshot.rings.active.progress >= 1,
-                isAvailable: snapshot.activity.hasData(for: .activeMinutes)
-            ),
-            FitnessGoalCardModel(
-                title: "Active Calories",
-                value: valueText(
-                    type: .activeEnergyBurned,
-                    value: DashboardFormatting.integer(snapshot.activity.activeCalories)
-                ),
-                unit: unitText(type: .activeEnergyBurned, unit: "kcal"),
-                progress: progressValue(type: .activeEnergyBurned, progress: snapshot.rings.move.progress),
-                systemImage: "flame.fill",
-                accentColor: .moveRing,
-                dataType: .activeEnergyBurned,
-                isHighlighted: snapshot.rings.move.progress >= 1,
-                isAvailable: snapshot.activity.hasData(for: .activeEnergyBurned)
-            ),
-            FitnessGoalCardModel(
-                title: "Distance",
-                value: valueText(type: .distance, value: distance.value),
-                unit: unitText(type: .distance, unit: distance.unit),
-                systemImage: "map.fill",
-                accentColor: .distanceAccent,
-                dataType: .distance,
-                isAvailable: snapshot.activity.hasData(for: .distance)
-            ),
-            FitnessGoalCardModel(
-                title: "Total Calories",
-                value: valueText(
-                    type: .totalCalories,
-                    value: DashboardFormatting.integer(snapshot.activity.totalCalories)
-                ),
-                unit: unitText(type: .totalCalories, unit: "kcal"),
-                systemImage: "flame.circle.fill",
-                accentColor: .calorieAccent,
-                dataType: .totalCalories,
-                isAvailable: snapshot.activity.hasData(for: .totalCalories)
-            )
-        ]
+        var cards: [FitnessGoalCardModel] = []
 
         cards.append(
             FitnessGoalCardModel(
@@ -149,19 +88,7 @@ struct TodayGoalsSection: View {
             )
         )
 
-        return cards
-    }
-
-    private func valueText(type: GoogleHealthDataType, value: String) -> String {
-        snapshot.activity.hasData(for: type) ? value : "No data"
-    }
-
-    private func unitText(type: GoogleHealthDataType, unit: String) -> String {
-        snapshot.activity.hasData(for: type) ? unit : ""
-    }
-
-    private func progressValue(type: GoogleHealthDataType, progress: Double) -> Double? {
-        snapshot.activity.hasData(for: type) ? progress : nil
+        return cards.filter(\.isAvailable)
     }
 
     private func sleepRange(for sleep: SleepSummary) -> String? {
@@ -196,8 +123,7 @@ struct RecentWorkoutSection: View {
                         VStack(alignment: .leading, spacing: 4) {
                             Text(workout.type)
                                 .font(.title3.weight(.bold))
-                                .lineLimit(1)
-                                .minimumScaleFactor(0.76)
+                                .fixedSize(horizontal: false, vertical: true)
 
                             Text(DashboardFormatting.compactDateTimeLabel(for: workout.startTime))
                                 .font(.headline.weight(.semibold))
@@ -214,23 +140,11 @@ struct RecentWorkoutSection: View {
                     }
 
                     VStack(alignment: .leading, spacing: 6) {
-                        HStack(alignment: .lastTextBaseline, spacing: 4) {
-                            Text(duration.value)
-                                .font(.system(size: 34, weight: .bold, design: .rounded))
-                                .monospacedDigit()
-                                .lineLimit(1)
-                                .minimumScaleFactor(0.50)
-                                .allowsTightening(true)
-                                .layoutPriority(1)
-
-                            if !duration.unit.isEmpty {
-                                Text(duration.unit)
-                                    .font(.headline.weight(.semibold))
-                                    .foregroundStyle(.secondary)
-                                    .lineLimit(1)
-                                    .minimumScaleFactor(0.64)
-                            }
-                        }
+                        DashboardCardValueRow(
+                            value: duration.value,
+                            unit: duration.unit,
+                            valueFontSize: 34
+                        )
 
                         if !workoutStats.isEmpty {
                             DashboardCardStatRow(stats: workoutStats)
@@ -238,7 +152,9 @@ struct RecentWorkoutSection: View {
                     }
                 }
                 .dashboardCard(border: workoutBorder, padding: 15)
-                .accessibilityElement(children: .combine)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(workout.type)
+                .accessibilityValue(workoutAccessibilityValue)
             }
             .buttonStyle(DashboardInteractiveCardButtonStyle())
             .disabled(onSelect == nil)
@@ -299,6 +215,17 @@ struct RecentWorkoutSection: View {
     private var workoutBorder: Color {
         onSelect == nil ? Color.dashboardStroke : Color.activeRing.opacity(0.18)
     }
+
+    private var workoutAccessibilityValue: String {
+        let statsDescription = workoutStats.map(\.text).joined(separator: ", ")
+        return [
+            DashboardFormatting.compactDateTimeLabel(for: workout.startTime),
+            DashboardAccessibilityFormatting.duration(workout.durationSeconds),
+            statsDescription
+        ]
+        .filter { !$0.isEmpty }
+        .joined(separator: ". ")
+    }
 }
 
 private struct DashboardSectionHeader<Trailing: View>: View {
@@ -313,9 +240,9 @@ private struct DashboardSectionHeader<Trailing: View>: View {
     var body: some View {
         HStack(alignment: .center, spacing: 12) {
             Text(title)
-                .font(.system(size: 28, weight: .bold, design: .rounded))
-                .lineLimit(1)
-                .minimumScaleFactor(0.72)
+                .font(.title2.weight(.bold))
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityAddTraits(.isHeader)
 
             Spacer(minLength: 0)
 
@@ -358,9 +285,6 @@ private struct FitnessGoalCard: View {
                     Text(card.title)
                         .font(.subheadline.weight(.bold))
                         .foregroundStyle(.primary)
-                        .lineLimit(2)
-                        .minimumScaleFactor(0.70)
-                        .allowsTightening(true)
                         .fixedSize(horizontal: false, vertical: true)
 
                     if let subtitle = card.subtitle {
@@ -403,6 +327,13 @@ private struct FitnessGoalCard: View {
             minHeight: 154
         )
         .accessibilityElement(children: .combine)
+        .accessibilityLabel(card.title)
+        .accessibilityValue(
+            DashboardAccessibilityFormatting.metric(
+                value: card.value,
+                unit: card.isAvailable ? card.unit : ""
+            )
+        )
     }
 
     private var cardBackground: Color {

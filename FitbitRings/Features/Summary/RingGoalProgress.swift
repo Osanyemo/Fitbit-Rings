@@ -20,31 +20,19 @@ private struct ProgressRow: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 10) {
-                Image(systemName: systemImage)
-                    .font(.subheadline.weight(.bold))
-                    .foregroundStyle(color)
-                    .frame(width: 20)
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 10) {
+                    titleLabel
+                    Spacer(minLength: 8)
+                    valueLabel
+                    percentLabel
+                }
 
-                Text(metric.title)
-                    .font(.subheadline.weight(.bold))
-
-                Spacer(minLength: 8)
-
-                Text(valueText)
-                    .font(.subheadline.weight(.semibold).monospacedDigit())
-                    .foregroundStyle(.secondary)
-                    .contentTransition(.numericText())
-                    .animation(progressAnimation, value: valueText)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.76)
-
-                Text(DashboardFormatting.percent(metric.progress))
-                    .font(.caption.weight(.bold).monospacedDigit())
-                    .foregroundStyle(color)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(color.opacity(0.12), in: Capsule())
+                VStack(alignment: .leading, spacing: 8) {
+                    titleLabel
+                    valueLabel
+                    percentLabel
+                }
             }
 
             ProgressView(value: metric.cappedProgress)
@@ -58,7 +46,36 @@ private struct ProgressRow: View {
             radius: DashboardCardRadius.compact,
             padding: 12
         )
-        .accessibilityElement(children: .combine)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(metric.title)
+        .accessibilityValue(
+            "\(DashboardAccessibilityFormatting.metric(value: DashboardFormatting.integer(metric.value), unit: metric.unit)), goal \(DashboardAccessibilityFormatting.metric(value: DashboardFormatting.integer(metric.goal), unit: metric.unit)), \(DashboardFormatting.percent(metric.progress))"
+        )
+    }
+
+    private var titleLabel: some View {
+        Label(metric.title, systemImage: systemImage)
+            .font(.subheadline.weight(.bold))
+            .foregroundStyle(color)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+
+    private var valueLabel: some View {
+        Text(valueText)
+            .font(.subheadline.weight(.semibold).monospacedDigit())
+            .foregroundStyle(.secondary)
+            .contentTransition(.numericText())
+            .animation(progressAnimation, value: valueText)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+
+    private var percentLabel: some View {
+        Text(DashboardFormatting.percent(metric.progress))
+            .font(.caption.weight(.bold).monospacedDigit())
+            .foregroundStyle(color)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(color.opacity(0.12), in: Capsule())
     }
 
     private var valueText: String {

@@ -43,6 +43,9 @@
 		B00000000000000000000034 /* FitbitRings/Features/Dashboard/FitnessDashboardStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000036 /* FitbitRings/Features/Dashboard/FitnessDashboardStore.swift */; };
 		B00000000000000000000035 /* FitbitRings/Features/Dashboard/FitnessDashboardTabs.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000037 /* FitbitRings/Features/Dashboard/FitnessDashboardTabs.swift */; };
 		B00000000000000000000036 /* FitbitRings/Features/Dashboard/DashboardCardComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000038 /* FitbitRings/Features/Dashboard/DashboardCardComponents.swift */; };
+		B00000000000000000000037 /* FitbitRings/Features/Dashboard/DashboardDesignSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000039 /* FitbitRings/Features/Dashboard/DashboardDesignSystem.swift */; };
+		B00000000000000000000038 /* FitbitRings/Features/Dashboard/AccessibleMetricChart.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000040 /* FitbitRings/Features/Dashboard/AccessibleMetricChart.swift */; };
+		B00000000000000000000039 /* FitbitRings/Resources/Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000041 /* FitbitRings/Resources/Localizable.xcstrings */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -101,6 +104,9 @@
 		A00000000000000000000036 /* FitbitRings/Features/Dashboard/FitnessDashboardStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FitbitRings/Features/Dashboard/FitnessDashboardStore.swift; sourceTree = SOURCE_ROOT; };
 		A00000000000000000000037 /* FitbitRings/Features/Dashboard/FitnessDashboardTabs.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FitbitRings/Features/Dashboard/FitnessDashboardTabs.swift; sourceTree = SOURCE_ROOT; };
 		A00000000000000000000038 /* FitbitRings/Features/Dashboard/DashboardCardComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FitbitRings/Features/Dashboard/DashboardCardComponents.swift; sourceTree = SOURCE_ROOT; };
+		A00000000000000000000039 /* FitbitRings/Features/Dashboard/DashboardDesignSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FitbitRings/Features/Dashboard/DashboardDesignSystem.swift; sourceTree = SOURCE_ROOT; };
+		A00000000000000000000040 /* FitbitRings/Features/Dashboard/AccessibleMetricChart.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FitbitRings/Features/Dashboard/AccessibleMetricChart.swift; sourceTree = SOURCE_ROOT; };
+		A00000000000000000000041 /* FitbitRings/Resources/Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = FitbitRings/Resources/Localizable.xcstrings; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -166,6 +172,8 @@
 				A00000000000000000000036 /* FitbitRings/Features/Dashboard/FitnessDashboardStore.swift */,
 				A00000000000000000000037 /* FitbitRings/Features/Dashboard/FitnessDashboardTabs.swift */,
 				A00000000000000000000038 /* FitbitRings/Features/Dashboard/DashboardCardComponents.swift */,
+				A00000000000000000000039 /* FitbitRings/Features/Dashboard/DashboardDesignSystem.swift */,
+				A00000000000000000000040 /* FitbitRings/Features/Dashboard/AccessibleMetricChart.swift */,
 				A00000000000000000000020 /* FitbitRings/Features/Summary/SummaryViewModel.swift */,
 				A00000000000000000000021 /* FitbitRings/Features/Summary/SummaryView.swift */,
 				A00000000000000000000022 /* FitbitRings/Features/Summary/ActivityRingsView.swift */,
@@ -174,6 +182,7 @@
 				A00000000000000000000025 /* FitbitRings/Features/Settings/SettingsView.swift */,
 				A00000000000000000000026 /* FitbitRings/Resources/Colors.swift */,
 				A00000000000000000000034 /* FitbitRings/Resources/Assets.xcassets */,
+				A00000000000000000000041 /* FitbitRings/Resources/Localizable.xcstrings */,
 				A00000000000000000000030 /* FitbitRings/Resources/Info.plist */,
 			);
 			name = FitbitRings;
@@ -318,6 +327,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				B00000000000000000000032 /* FitbitRings/Resources/Assets.xcassets in Resources */,
+				B00000000000000000000039 /* FitbitRings/Resources/Localizable.xcstrings in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -365,6 +375,8 @@
 				B00000000000000000000034 /* FitbitRings/Features/Dashboard/FitnessDashboardStore.swift in Sources */,
 				B00000000000000000000035 /* FitbitRings/Features/Dashboard/FitnessDashboardTabs.swift in Sources */,
 				B00000000000000000000036 /* FitbitRings/Features/Dashboard/DashboardCardComponents.swift in Sources */,
+				B00000000000000000000037 /* FitbitRings/Features/Dashboard/DashboardDesignSystem.swift in Sources */,
+				B00000000000000000000038 /* FitbitRings/Features/Dashboard/AccessibleMetricChart.swift in Sources */,
 				B00000000000000000000020 /* FitbitRings/Features/Summary/SummaryViewModel.swift in Sources */,
 				B00000000000000000000021 /* FitbitRings/Features/Summary/SummaryView.swift in Sources */,
 				B00000000000000000000022 /* FitbitRings/Features/Summary/ActivityRingsView.swift in Sources */,

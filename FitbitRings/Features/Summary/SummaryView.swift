@@ -10,58 +10,28 @@ struct SummaryView: View {
     var body: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 0) {
-                ActivityTopBand(
-                    snapshot: store.snapshot.summary,
-                    onSettings: {
-                        showingSettings = true
+                switch contentState {
+                case .initialLoading:
+                    DashboardLoadingState(title: "Loading your summary")
+                        .padding(.horizontal, 20)
+                        .padding(.top, 12)
+                case .failed(let message):
+                    DashboardFailureState(message: message) {
+                        Task { await store.refreshSummary(announcesResult: true) }
                     }
-                )
-                .padding(.horizontal, 20)
-                .padding(.top, 18)
-
-                VStack(alignment: .leading, spacing: 24) {
-                    if let errorMessage = store.errorMessage {
-                        SyncStatusBanner(errorMessage: errorMessage)
-                    }
-
-                    SummaryHourlyPairSection(
-                        snapshot: store.snapshot,
-                        units: store.preferences.units,
-                        onSelectMetric: { type in
-                            store.route(to: .metric(type))
-                        }
+                    .padding(.horizontal, 20)
+                    .padding(.top, 12)
+                case .empty:
+                    DashboardEmptyState(
+                        title: "No summary data yet",
+                        systemImage: "circle.grid.cross",
+                        message: "Pull to refresh after Google Health has activity to share."
                     )
-
-                    if let latestWorkout = store.snapshot.summary.latestWorkout {
-                        RecentWorkoutSection(
-                            workout: latestWorkout,
-                            units: store.preferences.units,
-                            onSelect: {
-                                if let workoutID = store.workoutID(matching: latestWorkout) {
-                                    store.route(to: .workout(workoutID))
-                                } else {
-                                    store.selectedTab = .workouts
-                                }
-                            }
-                        )
-                    }
-
-                    TodayGoalsSection(
-                        snapshot: store.snapshot.summary,
-                        units: store.preferences.units,
-                        onMetricSelected: { type in
-                            if type == .sleep,
-                               let sleepID = store.snapshot.health.sleepSessions.first?.id {
-                                store.route(to: .sleep(sleepID))
-                            } else {
-                                store.route(to: .metric(type))
-                            }
-                        }
-                    )
+                    .padding(.horizontal, 20)
+                    .padding(.top, 12)
+                case .cachedRefreshing, .populated:
+                    summaryContent
                 }
-                .padding(.horizontal, 20)
-                .padding(.top, 22)
-                .padding(.bottom, 38)
             }
         }
         .scrollIndicators(.hidden)
@@ -69,17 +39,22 @@ struct SummaryView: View {
             Color.fitbitBackground
                 .ignoresSafeArea()
         }
-        .overlay(alignment: .top) {
-            SummaryScrollEdgeFade(color: .fitbitBackground, edge: .top)
-        }
-        .overlay(alignment: .bottom) {
-            SummaryScrollEdgeFade(color: .fitbitBackground, edge: .bottom)
-        }
         .refreshable {
-            await store.refreshSummary()
+            await store.refreshSummary(announcesResult: true)
         }
         .animation(statusAnimation, value: store.errorMessage)
-        .toolbar(.hidden, for: .navigationBar)
+        .navigationTitle("Summary")
+        .navigationBarTitleDisplayMode(.large)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    showingSettings = true
+                } label: {
+                    Label("Settings", systemImage: "gearshape.fill")
+                }
+                .frame(minWidth: DashboardDesign.minimumControlSize, minHeight: DashboardDesign.minimumControlSize)
+            }
+        }
         .sheet(isPresented: $showingSettings) {
             SettingsView(
                 store: store,
@@ -92,63 +67,79 @@ struct SummaryView: View {
     private var statusAnimation: Animation? {
         reduceMotion ? nil : .smooth(duration: 0.22, extraBounce: 0)
     }
-}
 
-private struct SummaryScrollEdgeFade: View {
-    enum Edge {
-        case top
-        case bottom
-    }
-
-    let color: Color
-    let edge: Edge
-
-    var body: some View {
-        LinearGradient(
-            stops: stops,
-            startPoint: .top,
-            endPoint: .bottom
-        )
-        .frame(height: 56)
-        .frame(maxWidth: .infinity)
-        .ignoresSafeArea(edges: ignoredSafeAreaEdges)
-        .allowsHitTesting(false)
-        .accessibilityHidden(true)
-    }
-
-    private var stops: [Gradient.Stop] {
-        switch edge {
-        case .top:
-            return [
-                Gradient.Stop(color: color, location: 0),
-                Gradient.Stop(color: color.opacity(0.85), location: 0.28),
-                Gradient.Stop(color: color.opacity(0), location: 1)
-            ]
-        case .bottom:
-            return [
-                Gradient.Stop(color: color.opacity(0), location: 0),
-                Gradient.Stop(color: color.opacity(0.85), location: 0.72),
-                Gradient.Stop(color: color, location: 1)
-            ]
+    @ViewBuilder
+    private var summaryContent: some View {
+        if store.snapshot.summary.activity.hasAnyData {
+            ActivityTopBand(snapshot: store.snapshot.summary)
+                .padding(.horizontal, 20)
+                .padding(.top, 8)
         }
+
+        VStack(alignment: .leading, spacing: 24) {
+            if let errorMessage = store.errorMessage {
+                SyncStatusBanner(errorMessage: errorMessage)
+            }
+
+            SummaryHourlyPairSection(
+                snapshot: store.snapshot,
+                units: store.preferences.units,
+                onSelectMetric: { store.route(to: .metric($0)) }
+            )
+
+            if let latestWorkout = store.snapshot.summary.latestWorkout {
+                RecentWorkoutSection(
+                    workout: latestWorkout,
+                    units: store.preferences.units,
+                    onSelect: {
+                        if let workoutID = store.workoutID(matching: latestWorkout) {
+                            store.route(to: .workout(workoutID))
+                        } else {
+                            store.selectedTab = .workouts
+                        }
+                    }
+                )
+            }
+
+            TodayGoalsSection(
+                snapshot: store.snapshot.summary,
+                units: store.preferences.units,
+                onMetricSelected: { type in
+                    if type == .sleep,
+                       let sleepID = store.snapshot.health.sleepSessions.first?.id {
+                        store.route(to: .sleep(sleepID))
+                    } else {
+                        store.route(to: .metric(type))
+                    }
+                }
+            )
+        }
+        .padding(.horizontal, 20)
+        .padding(.top, 22)
+        .padding(.bottom, 38)
     }
 
-    private var ignoredSafeAreaEdges: SwiftUI.Edge.Set {
-        edge == .top ? .top : .bottom
+    private var contentState: DashboardContentState {
+        DashboardContentState(
+            section: store.sectionState(.summary),
+            hasContent: store.snapshot.summary.activity.hasAnyData
+                || store.snapshot.summary.latestWorkout != nil
+                || store.snapshot.summary.heart.mostRecentHeartRate != nil
+                || store.snapshot.summary.heart.restingHeartRate != nil
+                || store.snapshot.summary.sleep != nil
+        )
     }
 }
 
 private struct ActivityTopBand: View {
     let snapshot: DashboardSnapshot
-    let onSettings: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
-            ActivityHeader(
+            ActivityStatusHeader(
                 syncState: snapshot.syncState,
                 lastUpdated: snapshot.lastUpdated,
-                date: snapshot.date,
-                onSettings: onSettings
+                date: snapshot.date
             )
 
             ActivityHeroPanel(rings: snapshot.rings)
@@ -162,37 +153,13 @@ private struct ActivityTopBand: View {
     }
 }
 
-private struct ActivityHeader: View {
+private struct ActivityStatusHeader: View {
     let syncState: SyncState
     let lastUpdated: Date
     let date: Date
-    let onSettings: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .center, spacing: 14) {
-                Text("Summary")
-                    .font(.system(size: 36, weight: .bold, design: .rounded))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.75)
-
-                Spacer(minLength: 10)
-
-                Button(action: onSettings) {
-                    Image(systemName: "gearshape.fill")
-                        .font(.system(size: 16, weight: .bold))
-                        .frame(width: 36, height: 36)
-                        .background(.dashboardTintSurface, in: Circle())
-                        .overlay {
-                            Circle()
-                                .stroke(.dashboardStroke, lineWidth: 1)
-                        }
-                }
-                .buttonStyle(SummaryIconButtonStyle())
-                .foregroundStyle(.primary)
-                .accessibilityLabel("Settings")
-            }
-
             ViewThatFits(in: .horizontal) {
                 HStack(alignment: .center, spacing: 10) {
                     subtitleText
@@ -224,45 +191,44 @@ private struct ActivityHeader: View {
     }
 }
 
-private struct SummaryIconButtonStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .scaleEffect(configuration.isPressed ? 0.94 : 1)
-            .opacity(configuration.isPressed ? 0.82 : 1)
-            .animation(.smooth(duration: 0.14, extraBounce: 0), value: configuration.isPressed)
-    }
-}
-
 private struct ActivityHeroPanel: View {
     let rings: RingSet
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
+    @ViewBuilder
     var body: some View {
-        ViewThatFits(in: .horizontal) {
-            HStack(alignment: .center, spacing: 12) {
-                ActivityRingStats(rings: rings)
-                    .frame(width: 124, alignment: .leading)
+        if dynamicTypeSize.isAccessibilitySize {
+            verticalLayout
+        } else {
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .center, spacing: 16) {
+                    ActivityRingStats(rings: rings)
+                        .frame(minWidth: DashboardDesign.minimumCardWidth, alignment: .leading)
 
-                Spacer(minLength: 0)
+                    ActivityRingsView(
+                        rings: rings,
+                        showsCenterSummary: false,
+                        showsRingBadges: true
+                    )
+                    .frame(maxWidth: 190)
+                }
 
-                ActivityRingsView(
-                    rings: rings,
-                    showsCenterSummary: false,
-                    showsRingBadges: true
-                )
-                .frame(width: 176)
+                verticalLayout
             }
+        }
+    }
 
-            VStack(alignment: .leading, spacing: 16) {
-                ActivityRingsView(
-                    rings: rings,
-                    showsCenterSummary: false,
-                    showsRingBadges: true
-                )
-                .frame(maxWidth: 204)
-                .frame(maxWidth: .infinity)
+    private var verticalLayout: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            ActivityRingsView(
+                rings: rings,
+                showsCenterSummary: false,
+                showsRingBadges: true
+            )
+            .frame(maxWidth: 204)
+            .frame(maxWidth: .infinity)
 
-                ActivityRingStats(rings: rings)
-            }
+            ActivityRingStats(rings: rings)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -295,31 +261,30 @@ private struct ActivityRingStats: View {
                 Text(title)
                     .font(.caption.weight(.bold))
                     .foregroundStyle(color)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.72)
+                    .fixedSize(horizontal: false, vertical: true)
 
                 HStack(alignment: .lastTextBaseline, spacing: 3) {
                     Text(DashboardFormatting.integer(metric.value))
-                        .font(.system(size: 24, weight: .bold, design: .rounded))
+                        .font(.title2.bold().monospacedDigit())
                         .monospacedDigit()
                         .foregroundStyle(.primary)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.48)
-                        .allowsTightening(true)
+                        .fixedSize(horizontal: false, vertical: true)
 
                     Text(unit)
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.65)
-                        .allowsTightening(true)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
             .layoutPriority(1)
 
             Spacer(minLength: 0)
         }
-        .accessibilityElement(children: .combine)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(title)
+        .accessibilityValue(
+            "\(DashboardAccessibilityFormatting.metric(value: DashboardFormatting.integer(metric.value), unit: unit)), goal \(DashboardAccessibilityFormatting.metric(value: DashboardFormatting.integer(metric.goal), unit: unit)), \(DashboardFormatting.percent(metric.progress))"
+        )
     }
 }
 

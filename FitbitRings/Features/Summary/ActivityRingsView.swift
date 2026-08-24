@@ -5,6 +5,7 @@ struct ActivityRingsView: View {
     var showsCenterSummary = true
     var showsRingBadges = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.accessibilityDifferentiateWithoutColor) private var differentiateWithoutColor
 
     var body: some View {
         GeometryReader { geometry in
@@ -50,9 +51,8 @@ struct ActivityRingsView: View {
         .frame(maxWidth: .infinity)
         .padding(.horizontal, 2)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(
-            "Steps \(Int(rings.steps.value)) of \(Int(rings.steps.goal)), Exercise \(Int(rings.active.value)) of \(Int(rings.active.goal)) minutes, Move \(Int(rings.move.value)) of \(Int(rings.move.goal)) calories"
-        )
+        .accessibilityLabel("Activity progress")
+        .accessibilityValue(accessibilityValue)
     }
 
     private var centerSummary: some View {
@@ -124,7 +124,8 @@ struct ActivityRingsView: View {
                 .shadow(color: color.opacity(0.18), radius: lineWidth * 0.16, x: 0, y: 0)
                 .padding(ringPadding)
 
-            if showsRingBadges, ActivityRingGeometry.showsProgressHead(for: progress) {
+            if (showsRingBadges || differentiateWithoutColor),
+               ActivityRingGeometry.showsProgressHead(for: progress) {
                 ringHead(systemImage: systemImage, color: color, lineWidth: lineWidth)
                     .position(headPosition)
                     .transition(.scale(scale: 0.74).combined(with: .opacity))
@@ -191,6 +192,15 @@ struct ActivityRingsView: View {
 
     private var progressAnimation: Animation? {
         reduceMotion ? nil : .smooth(duration: 0.52, extraBounce: 0)
+    }
+
+    private var accessibilityValue: String {
+        [
+            "Steps \(DashboardFormatting.integer(rings.steps.value)) of \(DashboardFormatting.integer(rings.steps.goal)), \(DashboardFormatting.percent(rings.steps.progress))",
+            "Exercise \(DashboardFormatting.integer(rings.active.value)) of \(DashboardFormatting.integer(rings.active.goal)) minutes, \(DashboardFormatting.percent(rings.active.progress))",
+            "Move \(DashboardFormatting.integer(rings.move.value)) of \(DashboardFormatting.integer(rings.move.goal)) kilocalories, \(DashboardFormatting.percent(rings.move.progress))"
+        ]
+        .joined(separator: ". ")
     }
 }
 

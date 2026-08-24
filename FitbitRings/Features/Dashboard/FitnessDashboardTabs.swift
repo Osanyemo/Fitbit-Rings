@@ -73,41 +73,43 @@ struct SummaryHourlyPairSection: View {
     let units: UnitPreferences
     let onSelectMetric: (GoogleHealthDataType) -> Void
 
-    private let columns = [
-        GridItem(.flexible(), spacing: 12),
-        GridItem(.flexible(), spacing: 12)
-    ]
-
     var body: some View {
         let stepsPoints = hourlySeries(for: .steps)?.points ?? []
         let distancePoints = hourlySeries(for: .distance)?.points ?? []
         let reservesChartSpace = stepsPoints.count > 1 || distancePoints.count > 1
 
-        LazyVGrid(columns: columns, spacing: 12) {
-            DashboardMetricCard(
-                title: "Steps",
-                value: stepsValue,
-                unit: stepsUnit,
-                systemImage: GoogleHealthDataType.steps.symbolName,
-                accentColor: .stepsRing,
-                points: stepsPoints,
-                reservesChartSpace: reservesChartSpace,
-                isAvailable: snapshot.summary.activity.hasData(for: .steps)
-            ) {
-                onSelectMetric(.steps)
-            }
+        if snapshot.summary.activity.hasData(for: .steps)
+            || snapshot.summary.activity.hasData(for: .distance) {
+            DashboardAdaptiveGrid {
+                if snapshot.summary.activity.hasData(for: .steps) {
+                    DashboardMetricCard(
+                        title: "Steps",
+                        value: stepsValue,
+                        unit: stepsUnit,
+                        systemImage: GoogleHealthDataType.steps.symbolName,
+                        accentColor: .stepsRing,
+                        points: stepsPoints,
+                        reservesChartSpace: reservesChartSpace,
+                        isAvailable: true
+                    ) {
+                        onSelectMetric(.steps)
+                    }
+                }
 
-            DashboardMetricCard(
-                title: "Distance",
-                value: distanceValue.value,
-                unit: distanceValue.unit,
-                systemImage: GoogleHealthDataType.distance.symbolName,
-                accentColor: .distanceAccent,
-                points: distancePoints,
-                reservesChartSpace: reservesChartSpace,
-                isAvailable: snapshot.summary.activity.hasData(for: .distance)
-            ) {
-                onSelectMetric(.distance)
+                if snapshot.summary.activity.hasData(for: .distance) {
+                    DashboardMetricCard(
+                        title: "Distance",
+                        value: distanceValue.value,
+                        unit: distanceValue.unit,
+                        systemImage: GoogleHealthDataType.distance.symbolName,
+                        accentColor: .distanceAccent,
+                        points: distancePoints,
+                        reservesChartSpace: reservesChartSpace,
+                        isAvailable: true
+                    ) {
+                        onSelectMetric(.distance)
+                    }
+                }
             }
         }
     }
@@ -146,11 +148,24 @@ private struct ActivityTabView: View {
             subtitle: DashboardFormatting.compactUpdate(store.snapshot.summary.lastUpdated),
             state: store.sectionState(.activity),
             onRefresh: {
-                await store.refreshSection(.activity)
+                await store.refreshSection(.activity, announcesResult: true)
             }
         ) {
             VStack(alignment: .leading, spacing: 24) {
-                if hasActivityContent {
+                switch contentState {
+                case .initialLoading:
+                    DashboardLoadingState(title: "Loading activity")
+                case .failed(let message):
+                    DashboardFailureState(message: message) {
+                        Task { await store.refreshSection(.activity, announcesResult: true) }
+                    }
+                case .empty:
+                    DashboardEmptyState(
+                        title: "No activity data",
+                        systemImage: "figure.run.circle",
+                        message: "Activity appears here when Google Health has measurements to share."
+                    )
+                case .cachedRefreshing, .populated:
                     if store.snapshot.summary.activity.hasAnyData {
                         ActivityTodayFocusSection(
                             snapshot: store.snapshot.summary,
@@ -172,8 +187,6 @@ private struct ActivityTabView: View {
                     }
 
                     BucketedSeriesSection(series: store.snapshot.activity.bucketedSeries)
-                } else {
-                    DashboardEmptyState(title: "No activity data", systemImage: "figure.run.circle")
                 }
             }
         }
@@ -187,6 +200,13 @@ private struct ActivityTabView: View {
             || store.snapshot.activity.dailySeries.contains(where: { !$0.points.isEmpty })
             || !store.snapshot.activity.bucketedSeries.isEmpty
     }
+
+    private var contentState: DashboardContentState {
+        DashboardContentState(
+            section: store.sectionState(.activity),
+            hasContent: hasActivityContent
+        )
+    }
 }
 
 private struct WorkoutsTabView: View {
@@ -198,16 +218,33 @@ private struct WorkoutsTabView: View {
             subtitle: "Last 14 days",
             state: store.sectionState(.workouts),
             onRefresh: {
-                await store.refreshSection(.workouts)
+                await store.refreshSection(.workouts, announcesResult: true)
             }
         ) {
             VStack(alignment: .leading, spacing: 14) {
-                if store.snapshot.workouts.isEmpty {
-                    DashboardEmptyState(title: "No workouts", systemImage: "dumbbell")
-                } else {
-                    ForEach(store.snapshot.workouts) { workout in
-                        WorkoutRowCard(workout: workout, units: store.preferences.units) {
-                            store.workoutPath.append(.workout(workout.id))
+                switch contentState {
+                case .initialLoading:
+                    DashboardLoadingState(title: "Loading workouts")
+                case .failed(let message):
+                    DashboardFailureState(message: message) {
+                        Task { await store.refreshSection(.workouts, announcesResult: true) }
+                    }
+                case .empty:
+                    DashboardEmptyState(
+                        title: "No workouts",
+                        systemImage: "dumbbell",
+                        message: "Workouts from the last 14 days appear here."
+                    )
+                case .cachedRefreshing, .populated:
+                    ForEach(workoutGroups) { group in
+                        VStack(alignment: .leading, spacing: 12) {
+                            DashboardSectionTitle(title: LocalizedStringKey(group.title))
+
+                            ForEach(group.workouts) { workout in
+                                WorkoutRowCard(workout: workout, units: store.preferences.units) {
+                                    store.workoutPath.append(.workout(workout.id))
+                                }
+                            }
                         }
                     }
                 }
@@ -217,6 +254,37 @@ private struct WorkoutsTabView: View {
             await store.loadIfNeeded(.workouts)
         }
     }
+
+    private var contentState: DashboardContentState {
+        DashboardContentState(
+            section: store.sectionState(.workouts),
+            hasContent: !store.snapshot.workouts.isEmpty
+        )
+    }
+
+    private var workoutGroups: [WorkoutDayGroup] {
+        let calendar = Calendar.current
+        let groups = Dictionary(grouping: store.snapshot.workouts) {
+            calendar.startOfDay(for: $0.startTime)
+        }
+
+        return groups
+            .map { day, workouts in
+                WorkoutDayGroup(
+                    day: day,
+                    title: DashboardFormatting.compactDayLabel(for: day),
+                    workouts: workouts.sorted { $0.startTime > $1.startTime }
+                )
+            }
+            .sorted { $0.day > $1.day }
+    }
+}
+
+private struct WorkoutDayGroup: Identifiable {
+    var id: Date { day }
+    let day: Date
+    let title: String
+    let workouts: [WorkoutDetail]
 }
 
 private struct HealthTabView: View {
@@ -228,13 +296,24 @@ private struct HealthTabView: View {
             subtitle: "Last 14 days",
             state: store.sectionState(.health),
             onRefresh: {
-                await store.refreshSection(.health)
+                await store.refreshSection(.health, announcesResult: true)
             }
         ) {
             VStack(alignment: .leading, spacing: 22) {
-                if store.snapshot.health.isEmpty {
-                    DashboardEmptyState(title: "No health data", systemImage: "heart.text.square")
-                } else {
+                switch contentState {
+                case .initialLoading:
+                    DashboardLoadingState(title: "Loading health data")
+                case .failed(let message):
+                    DashboardFailureState(message: message) {
+                        Task { await store.refreshSection(.health, announcesResult: true) }
+                    }
+                case .empty:
+                    DashboardEmptyState(
+                        title: "No health data",
+                        systemImage: "heart.text.square",
+                        message: "Shared heart, sleep, vital, and body measurements appear here."
+                    )
+                case .cachedRefreshing, .populated:
                     HealthOverviewSection(
                         health: store.snapshot.health,
                         units: store.preferences.units,
@@ -290,6 +369,13 @@ private struct HealthTabView: View {
             await store.loadIfNeeded(.health)
         }
     }
+
+    private var contentState: DashboardContentState {
+        DashboardContentState(
+            section: store.sectionState(.health),
+            hasContent: !store.snapshot.health.isEmpty
+        )
+    }
 }
 
 private struct HealthOverviewSection: View {
@@ -298,18 +384,12 @@ private struct HealthOverviewSection: View {
     let onSelectMetric: (GoogleHealthDataType) -> Void
     let onSelectSleep: (String) -> Void
 
-    private let columns = [
-        GridItem(.flexible(), spacing: 12, alignment: .top),
-        GridItem(.flexible(), spacing: 12, alignment: .top)
-    ]
-
     @ViewBuilder
     var body: some View {
         let items = overviewItems
         if !items.isEmpty {
             VStack(alignment: .leading, spacing: 14) {
-                Text("Overview")
-                    .font(.title2.weight(.bold))
+                DashboardSectionTitle(title: "Overview")
 
                 if items.count == 1, let item = items.first {
                     Button {
@@ -319,7 +399,7 @@ private struct HealthOverviewSection: View {
                     }
                     .buttonStyle(DashboardInteractiveCardButtonStyle())
                 } else {
-                    LazyVGrid(columns: columns, spacing: 12) {
+                    DashboardAdaptiveGrid {
                         ForEach(items) { item in
                             Button {
                                 select(item)
@@ -443,15 +523,11 @@ private struct HealthOverviewCard: View {
                     Text(item.title)
                         .font(.subheadline.weight(.bold))
                         .foregroundStyle(.primary)
-                        .lineLimit(2, reservesSpace: true)
-                        .minimumScaleFactor(0.62)
-                        .allowsTightening(true)
+                        .fixedSize(horizontal: false, vertical: true)
 
                     Text(item.subtitle)
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(.secondary)
-                        .minimumScaleFactor(0.72)
-                        .allowsTightening(true)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 .layoutPriority(1)
@@ -473,7 +549,11 @@ private struct HealthOverviewCard: View {
             padding: 14,
             minHeight: 156
         )
-        .accessibilityElement(children: .combine)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(item.title)
+        .accessibilityValue(
+            "\(DashboardAccessibilityFormatting.metric(value: item.value, unit: item.unit)). \(item.subtitle)"
+        )
     }
 
     private var overviewBackground: Color {
@@ -526,7 +606,10 @@ private struct MetricDetailView: View {
                 if type.supportsDetailedChartRollups {
                     await store.loadMetricChart(type, range: selectedRange, force: true)
                 } else {
-                    await store.refreshSection(type.category == .activity ? .activity : .health)
+                    await store.refreshSection(
+                        type.category == .activity ? .activity : .health,
+                        announcesResult: true
+                    )
                 }
             }
         ) {
@@ -595,10 +678,13 @@ private struct MetricRangeChartSection: View {
         VStack(alignment: .leading, spacing: 14) {
             Picker("Range", selection: $selectedRange) {
                 ForEach(MetricChartRange.allCases) { range in
-                    Text(range.shortTitle).tag(range)
+                    Text(range.shortTitle)
+                        .tag(range)
+                        .accessibilityLabel(range.title)
                 }
             }
             .pickerStyle(.segmented)
+            .accessibilityLabel("Chart range")
 
             if let series {
                 if series.points.isEmpty {
@@ -616,43 +702,24 @@ private struct MetricRangeChartSection: View {
 
     private func chartCard(_ series: MetricChartSeries) -> some View {
         VStack(alignment: .leading, spacing: 16) {
-            HStack(alignment: .top, spacing: 12) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(summaryTitle)
-                        .font(.caption.weight(.bold))
-                        .foregroundStyle(.secondary)
-                        .tracking(1.1)
+            Text(summaryTitle)
+                .font(.caption.weight(.bold))
+                .foregroundStyle(.secondary)
+                .tracking(1.1)
 
-                    HStack(alignment: .lastTextBaseline, spacing: 4) {
-                        Text(summaryValue(for: series).value)
-                            .font(.system(size: 34, weight: .bold, design: .rounded))
-                            .monospacedDigit()
-                            .foregroundStyle(type.accentColor)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.50)
-                            .allowsTightening(true)
+            DashboardCardValueRow(
+                value: summaryValue(for: series).value,
+                unit: summaryValue(for: series).unit,
+                valueFontSize: 34,
+                unitFont: .title3.weight(.semibold),
+                valueColor: type.accentColor,
+                unitColor: type.accentColor
+            )
 
-                        let unit = summaryValue(for: series).unit
-                        if !unit.isEmpty {
-                            Text(unit)
-                                .font(.title3.weight(.semibold))
-                                .foregroundStyle(type.accentColor)
-                                .lineLimit(1)
-                                .minimumScaleFactor(0.70)
-                        }
-                    }
-                }
-
-                Spacer(minLength: 8)
-
-                Text(series.rangeSubtitle)
-                    .font(.headline.weight(.semibold))
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.trailing)
-                    .minimumScaleFactor(0.72)
-                    .allowsTightening(true)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
+            Text(series.rangeSubtitle)
+                .font(.headline.weight(.semibold))
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
 
             MetricTimeChart(
                 points: series.points,
@@ -662,8 +729,13 @@ private struct MetricRangeChartSection: View {
                 rangeEnd: series.rangeEnd,
                 mode: .full,
                 style: .bar,
+                title: "\(type.displayName), \(selectedRange.title)",
+                rangeDescription: series.rangeSubtitle,
                 axisLabel: { value in
                     DashboardFormatting.metricValue(value, type: type, units: units).value
+                },
+                accessibilityValue: { value in
+                    DashboardFormatting.accessibilityMetricValue(value, type: type, units: units)
                 }
             )
             .frame(height: 300)
@@ -708,45 +780,27 @@ private struct MetricTrendChartSection: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            HStack(alignment: .top, spacing: 12) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("RECENT TREND")
-                        .font(.caption.weight(.bold))
-                        .foregroundStyle(.secondary)
-                        .tracking(1.1)
+            Text("RECENT TREND")
+                .font(.caption.weight(.bold))
+                .foregroundStyle(.secondary)
+                .tracking(1.1)
 
-                    if let latest = series.latestPoint {
-                        let value = DashboardFormatting.metricValue(latest.value, type: series.type, units: units)
-                        HStack(alignment: .lastTextBaseline, spacing: 4) {
-                            Text(value.value)
-                                .font(.system(size: 32, weight: .bold, design: .rounded))
-                                .monospacedDigit()
-                                .foregroundStyle(series.type.accentColor)
-                                .lineLimit(1)
-                                .minimumScaleFactor(0.50)
-                                .allowsTightening(true)
-
-                            if !value.unit.isEmpty {
-                                Text(value.unit)
-                                    .font(.title3.weight(.semibold))
-                                    .foregroundStyle(series.type.accentColor)
-                                    .lineLimit(1)
-                                    .minimumScaleFactor(0.70)
-                            }
-                        }
-                    }
-                }
-
-                Spacer(minLength: 8)
-
-                Text(series.rangeSubtitle)
-                    .font(.headline.weight(.semibold))
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.trailing)
-                    .minimumScaleFactor(0.72)
-                    .allowsTightening(true)
-                    .fixedSize(horizontal: false, vertical: true)
+            if let latest = series.latestPoint {
+                let value = DashboardFormatting.metricValue(latest.value, type: series.type, units: units)
+                DashboardCardValueRow(
+                    value: value.value,
+                    unit: value.unit,
+                    valueFontSize: 32,
+                    unitFont: .title3.weight(.semibold),
+                    valueColor: series.type.accentColor,
+                    unitColor: series.type.accentColor
+                )
             }
+
+            Text(series.rangeSubtitle)
+                .font(.headline.weight(.semibold))
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
 
             MetricTimeChart(
                 points: series.points,
@@ -756,8 +810,13 @@ private struct MetricTrendChartSection: View {
                 rangeEnd: series.rangeEnd,
                 mode: .full,
                 style: .line,
+                title: "\(series.type.displayName) history",
+                rangeDescription: series.rangeSubtitle,
                 axisLabel: { value in
                     DashboardFormatting.metricValue(value, type: series.type, units: units).value
+                },
+                accessibilityValue: { value in
+                    DashboardFormatting.accessibilityMetricValue(value, type: series.type, units: units)
                 }
             )
             .frame(height: 260)
@@ -872,10 +931,26 @@ private struct DashboardScrollView<Content: View>: View {
         self.content = content()
     }
 
+    @ViewBuilder
     var body: some View {
+        if let onRefresh {
+            scrollContent
+                .refreshable {
+                    await onRefresh()
+                }
+        } else {
+            scrollContent
+        }
+    }
+
+    private var scrollContent: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
-                DashboardLargeHeader(title: title, subtitle: subtitle, state: state)
+                DashboardContextHeader(
+                    subtitle: subtitle,
+                    state: state,
+                    onRetry: onRefresh
+                )
                 content
             }
             .padding(.horizontal, 20)
@@ -884,65 +959,73 @@ private struct DashboardScrollView<Content: View>: View {
         }
         .scrollIndicators(.hidden)
         .background(Color.fitbitBackground.ignoresSafeArea())
-        .overlay(alignment: .top) {
-            DashboardScrollEdgeFade(color: .fitbitBackground, edge: .top)
-        }
-        .overlay(alignment: .bottom) {
-            DashboardScrollEdgeFade(color: .fitbitBackground, edge: .bottom)
-        }
-        .refreshable {
-            await refresh()
-        }
-        .navigationTitle(showsNavigationBackButton ? title : "")
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar(showsNavigationBackButton ? .visible : .hidden, for: .navigationBar)
-    }
-
-    private func refresh() async {
-        guard let onRefresh else { return }
-        await onRefresh()
+        .navigationTitle(title)
+        .navigationBarTitleDisplayMode(showsNavigationBackButton ? .inline : .large)
     }
 }
 
-private struct DashboardLargeHeader: View {
-    let title: String
+private struct DashboardContextHeader: View {
     var subtitle: String?
     var state: FitnessSectionState?
+    var onRetry: (() async -> Void)?
 
+    @ViewBuilder
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .firstTextBaseline) {
-                Text(title)
-                    .font(.system(size: 38, weight: .bold, design: .rounded))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.72)
+        if subtitle != nil || state?.phase == .loading || state?.errorMessage != nil {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(alignment: .firstTextBaseline, spacing: 10) {
+                    if let subtitle {
+                        Text(subtitle)
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
 
-                Spacer(minLength: 10)
+                    Spacer(minLength: 0)
 
-                if state?.phase == .loading {
-                    ProgressView()
-                        .controlSize(.small)
+                    if state?.phase == .loading {
+                        Label {
+                            Text("Refreshing")
+                                .font(.caption.weight(.semibold))
+                        } icon: {
+                            ProgressView()
+                                .controlSize(.mini)
+                        }
+                        .foregroundStyle(.secondary)
+                        .accessibilityLabel("Refreshing data")
+                    }
+                }
+
+                if let error = state?.errorMessage,
+                   state?.lastUpdated != .distantPast {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Label("Couldn’t refresh", systemImage: "exclamationmark.triangle.fill")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(.red)
+
+                        Text(error)
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+
+                        if let onRetry {
+                            Button("Try Again") {
+                                Task { await onRetry() }
+                            }
+                            .buttonStyle(.bordered)
+                            .controlSize(.regular)
+                        }
+                    }
+                    .dashboardCard(
+                        background: .dashboardErrorSurface,
+                        border: .dashboardErrorStroke,
+                        radius: DashboardDesign.Radius.compactCard,
+                        padding: 14
+                    )
                 }
             }
-
-            if let subtitle {
-                Text(subtitle)
-                    .font(.headline.weight(.semibold))
-                    .foregroundStyle(.secondary)
-                    .minimumScaleFactor(0.78)
-                    .allowsTightening(true)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-
-            if let error = state?.errorMessage {
-                Text(error)
-                    .font(.footnote.weight(.semibold))
-                    .foregroundStyle(Color(uiColor: .systemRed))
-                    .fixedSize(horizontal: false, vertical: true)
-                    .padding(.top, 2)
-            }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
@@ -950,18 +1033,10 @@ private struct ActivityTodayFocusSection: View {
     let snapshot: DashboardSnapshot
     let onSelectMetric: (GoogleHealthDataType) -> Void
 
-    private let columns = [
-        GridItem(.flexible(), spacing: 12),
-        GridItem(.flexible(), spacing: 12)
-    ]
-
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .center, spacing: 12) {
-                Text("Today Focus")
-                    .font(.title2.weight(.bold))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.78)
+            HStack(alignment: .firstTextBaseline, spacing: 12) {
+                DashboardSectionTitle(title: "Today Focus")
 
                 Spacer(minLength: 0)
 
@@ -980,7 +1055,7 @@ private struct ActivityTodayFocusSection: View {
                 onSelectMetric(primaryInsight.dataType)
             }
 
-            LazyVGrid(columns: columns, spacing: 12) {
+            DashboardAdaptiveGrid {
                 ForEach(supportingGoalInsights) { insight in
                     Button {
                         onSelectMetric(insight.dataType)
@@ -1018,7 +1093,7 @@ private struct ActivityTodayFocusSection: View {
     }
 
     private var supportingGoalInsights: [ActivityGoalInsight] {
-        goalInsights.filter { $0.id != primaryInsight.id }
+        goalInsights.filter { $0.id != primaryInsight.id && $0.isAvailable }
     }
 
     private var goalStatusText: String {
@@ -1144,8 +1219,7 @@ private struct ActivityStatusPill: View {
         Text(text)
             .font(.caption.weight(.bold).monospacedDigit())
             .foregroundStyle(.secondary)
-            .lineLimit(1)
-            .minimumScaleFactor(0.76)
+            .fixedSize(horizontal: false, vertical: true)
             .padding(.horizontal, 10)
             .padding(.vertical, 6)
             .background(.dashboardTintSurface, in: Capsule())
@@ -1167,9 +1241,7 @@ private struct ActivityGoalTile: View {
                 Text(insight.title)
                     .font(.caption.weight(.bold))
                     .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.62)
-                    .allowsTightening(true)
+                    .fixedSize(horizontal: false, vertical: true)
                     .layoutPriority(1)
 
                 Spacer(minLength: 4)
@@ -1180,27 +1252,23 @@ private struct ActivityGoalTile: View {
             VStack(alignment: .leading, spacing: 6) {
                 HStack(alignment: .lastTextBaseline, spacing: 3) {
                     Text(insight.value)
-                        .font(.system(size: 20, weight: .bold, design: .rounded))
+                        .font(.title3.bold().monospacedDigit())
                         .monospacedDigit()
                         .foregroundStyle(insight.isAvailable ? Color.primary : Color.secondary)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.48)
-                        .allowsTightening(true)
+                        .fixedSize(horizontal: false, vertical: true)
 
                     if !insight.unit.isEmpty {
                         Text(insight.unit)
                             .font(.caption.weight(.semibold))
                             .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.62)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
                 }
 
                 Text(insight.subtitle)
                     .font(.caption2.weight(.semibold))
                     .foregroundStyle(.secondary)
-                    .lineLimit(2)
-                    .minimumScaleFactor(0.72)
+                    .fixedSize(horizontal: false, vertical: true)
             }
 
             Spacer(minLength: 0)
@@ -1217,7 +1285,9 @@ private struct ActivityGoalTile: View {
             padding: 14,
             minHeight: 142
         )
-        .accessibilityElement(children: .combine)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(insight.title)
+        .accessibilityValue("\(insight.primaryValue) \(DashboardAccessibilityFormatting.expandedUnit(insight.primaryUnit, value: insight.primaryValue)). \(insight.subtitle)")
     }
 
     private var tileBackground: Color {
@@ -1265,9 +1335,7 @@ struct DashboardMetricCard: View {
                 Text(title)
                     .font(.subheadline.weight(.bold))
                     .foregroundStyle(.primary)
-                    .lineLimit(2, reservesSpace: true)
-                    .minimumScaleFactor(0.60)
-                    .allowsTightening(true)
+                    .fixedSize(horizontal: false, vertical: true)
                     .layoutPriority(1)
 
                 Spacer(minLength: onSelect == nil ? 0 : 24)
@@ -1283,8 +1351,6 @@ struct DashboardMetricCard: View {
                 Text(subtitle)
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(.secondary)
-                    .minimumScaleFactor(0.72)
-                    .allowsTightening(true)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -1320,6 +1386,9 @@ struct DashboardMetricCard: View {
             padding: 14,
             minHeight: showsChartSlot ? 190 : 142
         )
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(title)
+        .accessibilityValue(cardAccessibilityValue)
     }
 
     private var showsChartSlot: Bool {
@@ -1337,6 +1406,26 @@ struct DashboardMetricCard: View {
     private var chartPoints: [NumericMetricPoint] {
         chartSeries?.points ?? points
     }
+
+    private var cardAccessibilityValue: String {
+        let metricDescription: String
+        if unit == "m", ["elevation", "height", "altitude"].contains(where: title.lowercased().contains) {
+            metricDescription = "\(value) \(value == "1" ? "meter" : "meters")"
+        } else {
+            metricDescription = DashboardAccessibilityFormatting.metric(
+                value: isAvailable ? value : String(localized: "No data"),
+                unit: isAvailable ? unit : ""
+            )
+        }
+
+        var parts = [
+            metricDescription
+        ]
+        if let subtitle {
+            parts.append(subtitle)
+        }
+        return parts.joined(separator: ". ")
+    }
 }
 
 private struct DashboardSeriesSection: View {
@@ -1345,20 +1434,14 @@ private struct DashboardSeriesSection: View {
     let units: UnitPreferences
     let onSelectMetric: (GoogleHealthDataType) -> Void
 
-    private let columns = [
-        GridItem(.flexible(), spacing: 14),
-        GridItem(.flexible(), spacing: 14)
-    ]
-
     @ViewBuilder
     var body: some View {
         let visibleSeries = series.filter { !$0.points.isEmpty }
         if !visibleSeries.isEmpty {
             VStack(alignment: .leading, spacing: 14) {
-                Text(title)
-                    .font(.title2.weight(.bold))
+                DashboardSectionTitle(title: LocalizedStringKey(title))
 
-                LazyVGrid(columns: columns, spacing: 14) {
+                DashboardAdaptiveGrid(spacing: 14) {
                     ForEach(visibleSeries) { item in
                         let latest = item.latestPoint
                         let metricValue = latest.map {
@@ -1409,15 +1492,9 @@ private struct HealthSeriesSection: View {
     let units: UnitPreferences
     let onSelectMetric: (GoogleHealthDataType) -> Void
 
-    private let columns = [
-        GridItem(.flexible(), spacing: 12),
-        GridItem(.flexible(), spacing: 12)
-    ]
-
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text(title)
-                .font(.title2.weight(.bold))
+            DashboardSectionTitle(title: LocalizedStringKey(title))
 
             if series.count == 1 {
                 ForEach(series) { item in
@@ -1430,7 +1507,7 @@ private struct HealthSeriesSection: View {
                 }
             } else {
                 let reservesChartSpace = series.contains { $0.points.count > 1 }
-                LazyVGrid(columns: columns, spacing: 12) {
+                DashboardAdaptiveGrid {
                     ForEach(series) { item in
                         HealthSeriesCard(
                             series: item,
@@ -1498,8 +1575,7 @@ private struct BucketedSeriesSection: View {
     var body: some View {
         if !series.isEmpty {
             VStack(alignment: .leading, spacing: 14) {
-                Text("Intensity")
-                    .font(.title2.weight(.bold))
+                DashboardSectionTitle(title: "Intensity")
 
                 ForEach(series) { item in
                     BucketDistributionCard(series: item)
@@ -1522,8 +1598,6 @@ private struct BucketDistributionCard: View {
                     Text(series.rangeSubtitle)
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(.secondary)
-                        .minimumScaleFactor(0.72)
-                        .allowsTightening(true)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 .layoutPriority(1)
@@ -1533,8 +1607,7 @@ private struct BucketDistributionCard: View {
                 Text(totalText)
                     .font(.headline.weight(.bold).monospacedDigit())
                     .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.78)
+                    .fixedSize(horizontal: false, vertical: true)
             }
 
             ForEach(series.displayBuckets) { bucket in
@@ -1595,6 +1668,14 @@ private struct BucketList: View {
                         .foregroundStyle(.secondary)
                 }
                 .font(.subheadline.weight(.semibold))
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(bucket.label)
+                .accessibilityValue(
+                    DashboardAccessibilityFormatting.metric(
+                        value: DashboardFormatting.integer(bucket.value),
+                        unit: bucket.unit
+                    )
+                )
             }
         }
         .dashboardCard(
@@ -1611,8 +1692,7 @@ private struct SleepSessionsSection: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("Sleep")
-                .font(.title2.weight(.bold))
+            DashboardSectionTitle(title: "Sleep")
 
             if sessions.isEmpty {
                 DashboardEmptyState(title: "No sleep data", systemImage: "moon.zzz")
@@ -1641,13 +1721,11 @@ private struct HealthSleepSessionCard: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Sleep")
                         .font(.headline.weight(.bold))
-                        .lineLimit(1)
+                        .fixedSize(horizontal: false, vertical: true)
 
                     Text(sleepRange)
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(.secondary)
-                        .minimumScaleFactor(0.70)
-                        .allowsTightening(true)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 .layoutPriority(1)
@@ -1669,7 +1747,11 @@ private struct HealthSleepSessionCard: View {
             border: Color.sleepAccent.opacity(0.18),
             padding: 15
         )
-        .accessibilityElement(children: .combine)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Sleep")
+        .accessibilityValue(
+            "\(DashboardAccessibilityFormatting.duration(session.summaryValue.durationSeconds)). \(sleepRange). \(stageAccessibilityValue)"
+        )
         .accessibilityHint("Opens sleep details")
     }
 
@@ -1683,6 +1765,14 @@ private struct HealthSleepSessionCard: View {
         }
 
         return DashboardFormatting.compactDateTimeRangeLabel(start: session.startTime, end: session.endTime) ?? "Sleep session"
+    }
+
+    private var stageAccessibilityValue: String {
+        guard !session.displayStages.isEmpty else { return "No stage breakdown" }
+        let total = max(session.displayStages.reduce(0) { $0 + $1.durationSeconds }, 1)
+        return session.displayStages.map {
+            "\($0.stage), \(DashboardAccessibilityFormatting.duration($0.durationSeconds)), \(DashboardFormatting.percent($0.durationSeconds / total))"
+        }.joined(separator: ". ")
     }
 }
 
@@ -1744,15 +1834,13 @@ private struct SleepStageStrip: View {
 
                         VStack(alignment: .leading, spacing: 1) {
                             Text(stage.stage)
-                                .lineLimit(1)
-                                .minimumScaleFactor(0.72)
+                                .fixedSize(horizontal: false, vertical: true)
 
                             Text(stageDetail(for: stage))
                                 .font(.caption2.weight(.medium))
                                 .monospacedDigit()
                                 .foregroundStyle(.tertiary)
-                                .lineLimit(1)
-                                .minimumScaleFactor(0.72)
+                                .fixedSize(horizontal: false, vertical: true)
                         }
                     }
                 }
@@ -1801,7 +1889,9 @@ private struct SleepStageStrip: View {
 
     private var stageAccessibilityText: String {
         stages
-            .map { "\($0.stage) \(DashboardFormatting.duration($0.durationSeconds))" }
+            .map {
+                "\($0.stage), \(DashboardFormatting.duration($0.durationSeconds)), \(DashboardFormatting.percent($0.durationSeconds / totalDuration))"
+            }
             .joined(separator: ", ")
     }
 }
@@ -1817,11 +1907,15 @@ private struct WorkoutRowCard: View {
                 cardContent
             }
             .buttonStyle(DashboardInteractiveCardButtonStyle())
-            .accessibilityElement(children: .combine)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(workout.type)
+            .accessibilityValue(workoutAccessibilityValue)
             .accessibilityHint("Opens workout details")
         } else {
             cardContent
-                .accessibilityElement(children: .combine)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(workout.type)
+                .accessibilityValue(workoutAccessibilityValue)
         }
     }
 
@@ -1834,15 +1928,11 @@ private struct WorkoutRowCard: View {
                     Text(workout.type)
                         .font(.headline.weight(.bold))
                         .foregroundStyle(.primary)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.72)
-                        .allowsTightening(true)
+                        .fixedSize(horizontal: false, vertical: true)
 
                     Text(DashboardFormatting.compactDateTimeLabel(for: workout.startTime))
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(.secondary)
-                        .minimumScaleFactor(0.72)
-                        .allowsTightening(true)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 .layoutPriority(1)
@@ -1924,19 +2014,26 @@ private struct WorkoutRowCard: View {
     private var cardBorder: Color {
         onSelect == nil ? Color.dashboardStroke : Color.activeRing.opacity(0.20)
     }
+
+    private var workoutAccessibilityValue: String {
+        let date = DashboardFormatting.compactDateTimeLabel(for: workout.startTime)
+        let statsDescription = stats.map(\.text).joined(separator: ", ")
+        return [
+            date,
+            DashboardAccessibilityFormatting.duration(workout.durationSeconds),
+            statsDescription
+        ]
+        .filter { !$0.isEmpty }
+        .joined(separator: ". ")
+    }
 }
 
 private struct DetailMetricGrid: View {
     let metrics: [DetailMetric]
 
-    private let columns = [
-        GridItem(.flexible(), spacing: 14),
-        GridItem(.flexible(), spacing: 14)
-    ]
-
     var body: some View {
         if !metrics.isEmpty {
-            LazyVGrid(columns: columns, spacing: 14) {
+            DashboardAdaptiveGrid(spacing: 14) {
                 ForEach(metrics) { metric in
                     DashboardMetricCard(
                         title: metric.title,
@@ -1967,8 +2064,7 @@ private struct WorkoutSplitsSection: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Splits")
-                .font(.title2.weight(.bold))
+            DashboardSectionTitle(title: "Splits")
 
             ForEach(splits) { split in
                 VStack(alignment: .leading, spacing: 10) {
@@ -1994,6 +2090,7 @@ private struct WorkoutSplitsSection: View {
                     padding: 14,
                     alignment: .leading
                 )
+                .accessibilityElement(children: .combine)
             }
         }
     }
@@ -2005,8 +2102,7 @@ private struct MetricPointList: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("History")
-                .font(.title2.weight(.bold))
+            DashboardSectionTitle(title: "History")
 
             ForEach(series.points.sorted { $0.startDate > $1.startDate }) { point in
                 let value = DashboardFormatting.metricValue(point.value, type: series.type, units: units)
@@ -2050,8 +2146,6 @@ private struct MetricPointRow: View {
         Text(dateLabel)
             .font(.subheadline.weight(.semibold))
             .foregroundStyle(.primary)
-            .minimumScaleFactor(0.72)
-            .allowsTightening(true)
             .fixedSize(horizontal: false, vertical: true)
     }
 
@@ -2059,384 +2153,7 @@ private struct MetricPointRow: View {
         Text(value)
             .font(.headline.monospacedDigit())
             .foregroundStyle(.secondary)
-            .lineLimit(1)
-            .minimumScaleFactor(0.72)
-            .allowsTightening(true)
-    }
-}
-
-private struct MetricTimeChart: View {
-    enum Mode {
-        case compact
-        case full
-    }
-
-    private struct AxisTick: Identifiable {
-        var id: String { label }
-        let label: String
-        let date: Date
-    }
-
-    let points: [NumericMetricPoint]
-    let color: Color
-    var range: MetricChartRange?
-    var rangeStart: Date?
-    var rangeEnd: Date?
-    var mode: Mode
-    var style: MetricChartStyle
-    var axisLabel: (Double) -> String = { value in
-        abs(value) >= 10 ? DashboardFormatting.integer(value) : String(format: "%.1f", value)
-    }
-
-    @Environment(\.calendar) private var calendar
-
-    var body: some View {
-        GeometryReader { geometry in
-            let chartPoints = visiblePoints
-            let domain = chartDomain(for: chartPoints)
-            let values = valueDomain(for: chartPoints)
-            let plotRect = plotRect(in: geometry.size)
-            let barWidth = barWidth(in: plotRect.width, count: expectedSlotCount(in: domain))
-
-            ZStack(alignment: .topLeading) {
-                Path { path in
-                    for position in yGuidePositions(in: plotRect) {
-                        path.move(to: CGPoint(x: plotRect.minX, y: position))
-                        path.addLine(to: CGPoint(x: plotRect.maxX, y: position))
-                    }
-
-                    for tick in xAxisTicks(in: domain) {
-                        let x = xPosition(for: tick.date, domain: domain, plotRect: plotRect)
-                        path.move(to: CGPoint(x: x, y: plotRect.minY))
-                        path.addLine(to: CGPoint(x: x, y: plotRect.maxY))
-                    }
-                }
-                .stroke(Color.dashboardStroke.opacity(0.42), style: StrokeStyle(lineWidth: 1, dash: [3, 4]))
-
-                if style == .bar {
-                    ForEach(chartPoints) { point in
-                        let normalizedValue = normalizedValue(point.value, minimum: values.minimum, maximum: values.maximum)
-                        let height = barHeight(
-                            normalizedValue: normalizedValue,
-                            value: point.value,
-                            maxHeight: plotRect.height
-                        )
-
-                        RoundedRectangle(cornerRadius: min(5, barWidth / 2), style: .continuous)
-                            .fill(
-                                LinearGradient(
-                                    colors: [color.opacity(0.62), color.opacity(0.95)],
-                                    startPoint: .bottom,
-                                    endPoint: .top
-                                )
-                            )
-                            .frame(width: barWidth, height: height)
-                            .position(
-                                x: xPosition(for: point, domain: domain, plotRect: plotRect),
-                                y: plotRect.maxY - height / 2
-                            )
-                    }
-                } else {
-                    Path { path in
-                        var hasStarted = false
-                        for point in chartPoints {
-                            let location = pointLocation(
-                                for: point,
-                                domain: domain,
-                                values: values,
-                                plotRect: plotRect
-                            )
-                            if hasStarted {
-                                path.addLine(to: location)
-                            } else {
-                                path.move(to: location)
-                                hasStarted = true
-                            }
-                        }
-                    }
-                    .stroke(color.opacity(0.92), style: StrokeStyle(lineWidth: mode == .full ? 3 : 2, lineCap: .round, lineJoin: .round))
-
-                    ForEach(chartPoints) { point in
-                        Circle()
-                            .fill(color)
-                            .frame(width: mode == .full ? 7 : 4, height: mode == .full ? 7 : 4)
-                            .position(pointLocation(for: point, domain: domain, values: values, plotRect: plotRect))
-                    }
-                }
-
-                if mode == .full {
-                    axisLabels(values: values, domain: domain, plotRect: plotRect)
-                }
-            }
-        }
-        .accessibilityHidden(true)
-    }
-
-    private var visiblePoints: [NumericMetricPoint] {
-        mode == .compact ? Array(points.suffix(24)) : points
-    }
-
-    private func plotRect(in size: CGSize) -> CGRect {
-        let rightInset: CGFloat = mode == .full ? 50 : 0
-        let bottomInset: CGFloat = mode == .full ? 28 : 0
-        let topInset: CGFloat = mode == .full ? 8 : 0
-        return CGRect(
-            x: 0,
-            y: topInset,
-            width: max(1, size.width - rightInset),
-            height: max(1, size.height - topInset - bottomInset)
-        )
-    }
-
-    private func chartDomain(for points: [NumericMetricPoint]) -> (start: Date, end: Date) {
-        let start = rangeStart ?? points.first?.startDate ?? Date()
-        let rawEnd = rangeEnd ?? points.last?.endDate ?? points.last?.startDate ?? start.addingTimeInterval(1)
-        let end = rawEnd > start ? rawEnd : start.addingTimeInterval(1)
-        return (start, end)
-    }
-
-    private func valueDomain(for points: [NumericMetricPoint]) -> (minimum: Double, maximum: Double) {
-        guard !points.isEmpty else {
-            return (0, 1)
-        }
-
-        switch style {
-        case .bar:
-            return (0, max(points.map { max(0, $0.value) }.max() ?? 0, 1))
-        case .line:
-            let minimum = points.map(\.value).min() ?? 0
-            let maximum = points.map(\.value).max() ?? minimum + 1
-            guard maximum > minimum else {
-                return (minimum - 1, maximum + 1)
-            }
-
-            let padding = (maximum - minimum) * 0.12
-            return (minimum - padding, maximum + padding)
-        }
-    }
-
-    private func yGuidePositions(in plotRect: CGRect) -> [CGFloat] {
-        if mode == .compact {
-            return [plotRect.maxY - 0.5, plotRect.minY + plotRect.height * 0.42]
-        }
-
-        return [
-            plotRect.minY,
-            plotRect.minY + plotRect.height * 0.5,
-            plotRect.maxY
-        ]
-    }
-
-    private func expectedSlotCount(in domain: (start: Date, end: Date)) -> Int {
-        guard let range else {
-            return max(visiblePoints.count, 1)
-        }
-
-        switch range {
-        case .day:
-            return 24
-        case .week:
-            return 7
-        case .month:
-            return max(calendar.range(of: .day, in: .month, for: domain.start)?.count ?? 31, 1)
-        case .year:
-            return 12
-        }
-    }
-
-    private func barWidth(in width: CGFloat, count: Int) -> CGFloat {
-        let slotWidth = width / CGFloat(max(count, 1))
-        let preferredWidth = slotWidth * 0.62
-        let maximum: CGFloat = mode == .full ? 34 : 12
-        return min(maximum, max(2, preferredWidth))
-    }
-
-    private func barHeight(normalizedValue: Double, value: Double, maxHeight: CGFloat) -> CGFloat {
-        guard value > 0 else { return 2 }
-        return max(mode == .full ? 5 : 4, maxHeight * CGFloat(normalizedValue))
-    }
-
-    private func normalizedValue(_ value: Double, minimum: Double, maximum: Double) -> Double {
-        guard maximum > minimum else {
-            return 0
-        }
-
-        return min(max((value - minimum) / (maximum - minimum), 0), 1)
-    }
-
-    private func pointLocation(
-        for point: NumericMetricPoint,
-        domain: (start: Date, end: Date),
-        values: (minimum: Double, maximum: Double),
-        plotRect: CGRect
-    ) -> CGPoint {
-        CGPoint(
-            x: xPosition(for: point, domain: domain, plotRect: plotRect),
-            y: yPosition(for: point.value, values: values, plotRect: plotRect)
-        )
-    }
-
-    private func xPosition(
-        for point: NumericMetricPoint,
-        domain: (start: Date, end: Date),
-        plotRect: CGRect
-    ) -> CGFloat {
-        let fallbackDuration = fallbackSlotDuration(for: domain)
-        let duration = point.endDate?.timeIntervalSince(point.startDate) ?? fallbackDuration
-        let centerDate = point.startDate.addingTimeInterval(max(duration, fallbackDuration) / 2)
-        return xPosition(for: centerDate, domain: domain, plotRect: plotRect)
-    }
-
-    private func xPosition(
-        for date: Date,
-        domain: (start: Date, end: Date),
-        plotRect: CGRect
-    ) -> CGFloat {
-        let totalDuration = max(domain.end.timeIntervalSince(domain.start), 1)
-        let elapsed = min(max(date.timeIntervalSince(domain.start), 0), totalDuration)
-        return plotRect.minX + plotRect.width * CGFloat(elapsed / totalDuration)
-    }
-
-    private func yPosition(
-        for value: Double,
-        values: (minimum: Double, maximum: Double),
-        plotRect: CGRect
-    ) -> CGFloat {
-        let normalized = normalizedValue(value, minimum: values.minimum, maximum: values.maximum)
-        return plotRect.maxY - plotRect.height * CGFloat(normalized)
-    }
-
-    private func fallbackSlotDuration(for domain: (start: Date, end: Date)) -> TimeInterval {
-        let duration = max(domain.end.timeIntervalSince(domain.start), 1)
-        return duration / Double(max(expectedSlotCount(in: domain), 1))
-    }
-
-    private func xAxisTicks(in domain: (start: Date, end: Date)) -> [AxisTick] {
-        guard mode == .full else {
-            return []
-        }
-
-        guard let range else {
-            return [
-                AxisTick(label: DashboardFormatting.compactDayLabel(for: domain.start), date: domain.start),
-                AxisTick(label: DashboardFormatting.compactDayLabel(for: domain.end), date: domain.end)
-            ]
-        }
-
-        switch range {
-        case .day:
-            return [0, 6, 12, 18].compactMap { hour in
-                guard let date = calendar.date(byAdding: .hour, value: hour, to: domain.start) else { return nil }
-                let label = hour == 0 ? "12 AM" : hour == 12 ? "12 PM" : "\(hour % 12) \(hour < 12 ? "AM" : "PM")"
-                return AxisTick(label: label, date: date)
-            }
-        case .week:
-            let formatter = DateFormatter()
-            formatter.setLocalizedDateFormatFromTemplate("EEE")
-            formatter.calendar = calendar
-            return (0..<7).compactMap { offset in
-                guard let date = calendar.date(byAdding: .day, value: offset, to: domain.start) else { return nil }
-                return AxisTick(label: formatter.string(from: date), date: date)
-            }
-        case .month:
-            let days = [1, 8, 15, 22, 29]
-            return days.compactMap { day -> AxisTick? in
-                var components = calendar.dateComponents([.year, .month], from: domain.start)
-                components.day = day
-                guard let date = calendar.date(from: components), date < domain.end else {
-                    return nil
-                }
-                return AxisTick(label: "\(day)", date: date)
-            }
-        case .year:
-            let formatter = DateFormatter()
-            formatter.dateFormat = "LLLLL"
-            formatter.calendar = calendar
-            return (0..<12).compactMap { monthOffset in
-                guard let date = calendar.date(byAdding: .month, value: monthOffset, to: domain.start) else { return nil }
-                return AxisTick(label: formatter.string(from: date), date: date)
-            }
-        }
-    }
-
-    @ViewBuilder
-    private func axisLabels(
-        values: (minimum: Double, maximum: Double),
-        domain: (start: Date, end: Date),
-        plotRect: CGRect
-    ) -> some View {
-        let midpoint = values.minimum + (values.maximum - values.minimum) / 2
-        ForEach(
-            [
-                (axisLabel(values.maximum), plotRect.minY),
-                (axisLabel(midpoint), plotRect.minY + plotRect.height * 0.5),
-                (axisLabel(values.minimum), plotRect.maxY)
-            ],
-            id: \.0
-        ) { label, y in
-            Text(label)
-                .font(.caption.weight(.semibold).monospacedDigit())
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-                .minimumScaleFactor(0.72)
-                .position(x: plotRect.maxX + 26, y: y)
-        }
-
-        ForEach(xAxisTicks(in: domain)) { tick in
-            Text(tick.label)
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-                .minimumScaleFactor(0.65)
-                .position(
-                    x: xPosition(for: tick.date, domain: domain, plotRect: plotRect),
-                    y: plotRect.maxY + 18
-                )
-        }
-    }
-}
-
-private struct DashboardScrollEdgeFade: View {
-    enum Edge {
-        case top
-        case bottom
-    }
-
-    let color: Color
-    let edge: Edge
-
-    var body: some View {
-        LinearGradient(
-            stops: stops,
-            startPoint: .top,
-            endPoint: .bottom
-        )
-        .frame(height: 56)
-        .frame(maxWidth: .infinity)
-        .ignoresSafeArea(edges: ignoredSafeAreaEdges)
-        .allowsHitTesting(false)
-        .accessibilityHidden(true)
-    }
-
-    private var stops: [Gradient.Stop] {
-        switch edge {
-        case .top:
-            return [
-                Gradient.Stop(color: color, location: 0),
-                Gradient.Stop(color: color.opacity(0.85), location: 0.28),
-                Gradient.Stop(color: color.opacity(0), location: 1)
-            ]
-        case .bottom:
-            return [
-                Gradient.Stop(color: color.opacity(0), location: 0),
-                Gradient.Stop(color: color.opacity(0.85), location: 0.72),
-                Gradient.Stop(color: color, location: 1)
-            ]
-        }
-    }
-
-    private var ignoredSafeAreaEdges: SwiftUI.Edge.Set {
-        edge == .top ? .top : .bottom
+            .fixedSize(horizontal: false, vertical: true)
     }
 }
 
@@ -2516,7 +2233,7 @@ private extension GoogleHealthDataType {
     }
 }
 
-private extension DashboardFormatting {
+extension DashboardFormatting {
     static func metricValue(
         _ value: Double,
         type: GoogleHealthDataType,
@@ -2526,11 +2243,11 @@ private extension DashboardFormatting {
         case .distance:
             return distanceParts(value, unit: units.distanceUnit)
         case .height, .altitude:
-            return DashboardFormatting.MetricValue(value: String(format: "%.2f", value), unit: "m")
+            return DashboardFormatting.MetricValue(value: decimal(value, maximumFractionDigits: 2), unit: "m")
         case .weight:
-            return DashboardFormatting.MetricValue(value: String(format: "%.1f", value), unit: "kg")
+            return DashboardFormatting.MetricValue(value: decimal(value, maximumFractionDigits: 1), unit: "kg")
         case .bodyFat, .oxygenSaturation, .dailyOxygenSaturation:
-            return DashboardFormatting.MetricValue(value: String(format: "%.1f", value), unit: "%")
+            return DashboardFormatting.MetricValue(value: decimal(value, maximumFractionDigits: 1), unit: "%")
         case .heartRate, .dailyRestingHeartRate:
             return DashboardFormatting.MetricValue(value: integer(value), unit: "bpm")
         case .heartRateVariability, .dailyHeartRateVariability:
@@ -2544,11 +2261,11 @@ private extension DashboardFormatting {
         case .floors:
             return DashboardFormatting.MetricValue(value: integer(value), unit: "floors")
         case .respiratoryRateSleepSummary, .dailyRespiratoryRate:
-            return DashboardFormatting.MetricValue(value: String(format: "%.1f", value), unit: "brpm")
+            return DashboardFormatting.MetricValue(value: decimal(value, maximumFractionDigits: 1), unit: "brpm")
         case .dailySleepTemperatureDerivations, .coreBodyTemperature:
-            return DashboardFormatting.MetricValue(value: String(format: "%.1f", value), unit: "deg")
+            return DashboardFormatting.MetricValue(value: decimal(value, maximumFractionDigits: 1), unit: "deg")
         case .vo2Max, .dailyVo2Max, .runVo2Max:
-            return DashboardFormatting.MetricValue(value: String(format: "%.1f", value), unit: "ml/kg/min")
+            return DashboardFormatting.MetricValue(value: decimal(value, maximumFractionDigits: 1), unit: "ml/kg/min")
         case .bloodGlucose:
             return DashboardFormatting.MetricValue(value: integer(value), unit: "mg/dL")
         case .activityLevel, .swimLengthsData:
@@ -2556,6 +2273,35 @@ private extension DashboardFormatting {
         case .exercise, .dailyHeartRateZones, .sleep:
             return DashboardFormatting.MetricValue(value: integer(value), unit: type.unit)
         }
+    }
+
+    static func accessibilityMetricValue(
+        _ value: Double,
+        type: GoogleHealthDataType,
+        units: UnitPreferences
+    ) -> String {
+        let formatted = metricValue(value, type: type, units: units)
+        let expandedUnit: String
+
+        switch type {
+        case .height, .altitude:
+            expandedUnit = value == 1 ? "meter" : "meters"
+        case .weight:
+            expandedUnit = value == 1 ? "kilogram" : "kilograms"
+        case .bodyFat, .oxygenSaturation, .dailyOxygenSaturation:
+            expandedUnit = "percent"
+        case .activeMinutes, .activeZoneMinutes, .timeInHeartRateZone, .sedentaryPeriod:
+            expandedUnit = value == 1 ? "minute" : "minutes"
+        default:
+            expandedUnit = DashboardAccessibilityFormatting.expandedUnit(
+                formatted.unit,
+                value: formatted.value
+            )
+        }
+
+        return expandedUnit.isEmpty
+            ? formatted.value
+            : "\(formatted.value) \(expandedUnit)"
     }
 }
 
@@ -2594,7 +2340,7 @@ private extension WorkoutDetail {
 
         if let elevation = metricsSummary.elevationGainMeters {
             metrics.append(
-                DetailMetric(title: "Elevation", value: String(format: "%.0f", elevation), unit: "m", systemImage: "mountain.2", color: .distanceAccent)
+                DetailMetric(title: "Elevation", value: DashboardFormatting.decimal(elevation, maximumFractionDigits: 0), unit: "m", systemImage: "mountain.2", color: .distanceAccent)
             )
         }
 
@@ -2618,7 +2364,7 @@ private extension WorkoutDetail {
 
         if let speed = metricsSummary.averageSpeedMetersPerSecond {
             metrics.append(
-                DetailMetric(title: "Speed", value: String(format: "%.1f", speed), unit: "m/s", systemImage: "gauge", color: .activeRing)
+                DetailMetric(title: "Speed", value: DashboardFormatting.decimal(speed, maximumFractionDigits: 1), unit: "m/s", systemImage: "gauge", color: .activeRing)
             )
         }
 
@@ -2660,8 +2406,47 @@ private extension WorkoutDetail {
     )
 }
 
+#Preview("AX5 Dark Increased Contrast") {
+    FitnessDashboardView(
+        store: .preview(snapshot: .previewPopulatedFitness),
+        accountEmail: "a-very-long-accessible-account-identifier@example.com",
+        onSignOut: {}
+    )
+    .preferredColorScheme(.dark)
+    .environment(\.dynamicTypeSize, .accessibility5)
+}
+
+#Preview("RTL Light") {
+    FitnessDashboardView(
+        store: .preview(snapshot: .previewPopulatedFitness),
+        accountEmail: "osanyemosadebe@example.com",
+        onSignOut: {}
+    )
+    .preferredColorScheme(.light)
+    .environment(\.layoutDirection, .rightToLeft)
+}
+
+#Preview("Motion-Safe Static State") {
+    FitnessDashboardView(
+        store: .preview(snapshot: .previewPopulatedFitness),
+        accountEmail: "osanyemosadebe@example.com",
+        onSignOut: {}
+    )
+    .transaction { transaction in
+        transaction.animation = nil
+    }
+}
+
+#Preview("Landscape", traits: .landscapeLeft) {
+    FitnessDashboardView(
+        store: .preview(snapshot: .previewPopulatedFitness),
+        accountEmail: "osanyemosadebe@example.com",
+        onSignOut: {}
+    )
+}
+
 @MainActor
-private extension FitnessDashboardStore {
+extension FitnessDashboardStore {
     static func preview(snapshot: FitnessDataSnapshot) -> FitnessDashboardStore {
         let cache = DashboardPreviewCache(snapshot: snapshot, preferences: .defaults)
         let repository = DashboardRepository(
@@ -2684,6 +2469,17 @@ private extension FitnessDashboardStore {
         return store
     }
 
+    static func previewInitialActivityLoading() -> FitnessDashboardStore {
+        let store = preview(snapshot: .empty())
+        store.selectedTab = .activity
+        store.sectionStates[.activity] = FitnessSectionState(
+            phase: .loading,
+            lastUpdated: .distantPast,
+            errorMessage: nil
+        )
+        return store
+    }
+
     static func previewFailedHealth() -> FitnessDashboardStore {
         let store = preview(snapshot: .previewPopulatedFitness)
         store.selectedTab = .health
@@ -2696,7 +2492,7 @@ private extension FitnessDashboardStore {
     }
 }
 
-private extension FitnessDataSnapshot {
+extension FitnessDataSnapshot {
     static var previewPopulatedFitness: FitnessDataSnapshot {
         let summary = DashboardSnapshot(
             date: .now,

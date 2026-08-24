@@ -4,6 +4,127 @@ import XCTest
 @testable import FitbitRings
 
 final class DashboardTests: XCTestCase {
+    func testSessionStartsInRestoringPhase() {
+        let phase = AppSessionPhase.restoring
+
+        XCTAssertEqual(phase, .restoring)
+        XCTAssertNotEqual(phase, .signedOut)
+    }
+
+    func testSessionRestorationResolvesWithoutShowingTheWrongSurface() {
+        XCTAssertEqual(
+            AppSessionPhase.afterRestoration(isSignedIn: true),
+            .signedIn
+        )
+        XCTAssertEqual(
+            AppSessionPhase.afterRestoration(isSignedIn: false),
+            .signedOut
+        )
+    }
+
+    func testDashboardContentStateDistinguishesInitialLoadingFromCachedRefresh() {
+        let loading = FitnessSectionState(
+            phase: .loading,
+            lastUpdated: .distantPast,
+            errorMessage: nil
+        )
+
+        XCTAssertEqual(
+            DashboardContentState(section: loading, hasContent: false),
+            .initialLoading
+        )
+        XCTAssertEqual(
+            DashboardContentState(section: loading, hasContent: true),
+            .cachedRefreshing
+        )
+    }
+
+    func testDashboardContentStateShowsFailureOnlyWithoutCachedContent() {
+        let failed = FitnessSectionState(
+            phase: .failed,
+            lastUpdated: .distantPast,
+            errorMessage: "Try again"
+        )
+
+        XCTAssertEqual(
+            DashboardContentState(section: failed, hasContent: false),
+            .failed("Try again")
+        )
+        XCTAssertEqual(
+            DashboardContentState(section: failed, hasContent: true),
+            .populated
+        )
+    }
+
+    func testAdaptiveGridUsesOneColumnAtAccessibilitySizes() {
+        XCTAssertFalse(
+            DashboardGridPolicy.usesSingleColumn(
+                dynamicTypeSize: .large,
+                assistiveAccessEnabled: false
+            )
+        )
+        XCTAssertTrue(
+            DashboardGridPolicy.usesSingleColumn(
+                dynamicTypeSize: .accessibility5,
+                assistiveAccessEnabled: false
+            )
+        )
+        XCTAssertTrue(
+            DashboardGridPolicy.usesSingleColumn(
+                dynamicTypeSize: .large,
+                assistiveAccessEnabled: true
+            )
+        )
+    }
+
+    func testMetricAccessibilityFormattingSpellsOutUnits() {
+        XCTAssertEqual(
+            DashboardAccessibilityFormatting.metric(value: "72", unit: "bpm"),
+            "72 beats per minute"
+        )
+        XCTAssertEqual(
+            DashboardAccessibilityFormatting.metric(value: "1", unit: "km"),
+            "1 kilometer"
+        )
+    }
+
+    func testDecimalFormattingUsesRequestedLocale() {
+        let formatted = DashboardFormatting.decimal(
+            12.5,
+            maximumFractionDigits: 1,
+            locale: Locale(identifier: "fr_FR")
+        )
+
+        XCTAssertEqual(formatted, "12,5")
+    }
+
+    func testAccessibleChartDescriptorContainsEveryDataPoint() {
+        let points = [
+            NumericMetricPoint(
+                id: "one",
+                startDate: Date(timeIntervalSince1970: 1_000),
+                value: 1,
+                unit: "steps"
+            ),
+            NumericMetricPoint(
+                id: "two",
+                startDate: Date(timeIntervalSince1970: 2_000),
+                value: 2,
+                unit: "steps"
+            )
+        ]
+        let descriptor = MetricChartAccessibilityDescriptor(
+            title: "Steps",
+            summary: "Two measurements",
+            points: points,
+            valueDescription: { "\(Int($0)) steps" }
+        ).makeChartDescriptor()
+
+        XCTAssertEqual(descriptor.title, "Steps")
+        XCTAssertEqual(descriptor.summary, "Two measurements")
+        XCTAssertEqual(descriptor.series.first?.dataPoints.count, points.count)
+    }
+
     func testRingProgressCapsAtOneForRendering() {
         let metric = RingMetric(title: "Steps", value: 12_500, goal: 10_000, unit: "")
         let nonFiniteMetric = RingMetric(title: "Steps", value: .infinity, goal: 10_000, unit: "")

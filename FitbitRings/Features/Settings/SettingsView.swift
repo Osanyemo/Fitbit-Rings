@@ -11,6 +11,7 @@ struct SettingsView: View {
     @State private var stepGoal: Int
     @State private var distanceUnit: DistanceUnit
     @State private var appearance: AppearancePreference
+    @State private var isConfirmingDisconnect = false
 
     init(store: FitnessDashboardStore, accountEmail: String?, onSignOut: @escaping () -> Void) {
         self.store = store
@@ -30,12 +31,18 @@ struct SettingsView: View {
                     Stepper(value: $stepGoal, in: 1_000...50_000, step: 500) {
                         SettingsValueRow(title: "Steps", value: DashboardFormatting.integer(Double(stepGoal)))
                     }
+                    .accessibilityLabel("Step goal")
+                    .accessibilityValue("\(stepGoal) steps")
                     Stepper(value: $activeGoal, in: 5...240, step: 5) {
                         SettingsValueRow(title: "Active", value: "\(activeGoal) min")
                     }
+                    .accessibilityLabel("Active minute goal")
+                    .accessibilityValue("\(activeGoal) minutes")
                     Stepper(value: $moveGoal, in: 50...2_000, step: 25) {
                         SettingsValueRow(title: "Move", value: "\(moveGoal) kcal")
                     }
+                    .accessibilityLabel("Move goal")
+                    .accessibilityValue("\(moveGoal) kilocalories")
                 }
 
                 Section("Units") {
@@ -56,8 +63,7 @@ struct SettingsView: View {
                 Section("Google Health") {
                     SettingsValueRow(title: "Account", value: accountEmail ?? "Connected")
                     Button(role: .destructive) {
-                        onSignOut()
-                        dismiss()
+                        isConfirmingDisconnect = true
                     } label: {
                         Label("Disconnect Google Health", systemImage: "person.crop.circle.badge.xmark")
                     }
@@ -82,6 +88,15 @@ struct SettingsView: View {
                     }
                 }
             }
+            .alert("Disconnect Google Health?", isPresented: $isConfirmingDisconnect) {
+                Button("Cancel", role: .cancel) {}
+                Button("Disconnect", role: .destructive) {
+                    onSignOut()
+                    dismiss()
+                }
+            } message: {
+                Text("This signs you out and removes cached health data from this iPhone. You can reconnect later.")
+            }
         }
     }
 }
@@ -91,12 +106,27 @@ private struct SettingsValueRow: View {
     let value: String
 
     var body: some View {
-        HStack {
-            Text(title)
-            Spacer()
-            Text(value)
-                .foregroundStyle(.secondary)
-                .monospacedDigit()
+        ViewThatFits(in: .horizontal) {
+            HStack(alignment: .firstTextBaseline, spacing: 12) {
+                Text(title)
+                Spacer(minLength: 12)
+                valueText
+                    .multilineTextAlignment(.trailing)
+            }
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                valueText
+            }
         }
+        .accessibilityElement(children: .combine)
+    }
+
+    private var valueText: some View {
+        Text(value)
+            .foregroundStyle(.secondary)
+            .monospacedDigit()
+            .textSelection(.enabled)
+            .fixedSize(horizontal: false, vertical: true)
     }
 }
