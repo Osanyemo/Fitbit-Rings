@@ -52,12 +52,12 @@ private struct ProgressRow: View {
                 .scaleEffect(x: 1, y: 1.25, anchor: .center)
                 .animation(progressAnimation, value: metric.cappedProgress)
         }
-        .padding(12)
-        .background(.dashboardMetricSurface, in: RoundedRectangle(cornerRadius: DashboardCardRadius.compact, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: DashboardCardRadius.compact, style: .continuous)
-                .stroke(color.opacity(0.10), lineWidth: 1)
-        }
+        .dashboardCard(
+            background: .dashboardMetricSurface,
+            border: color.opacity(0.10),
+            radius: DashboardCardRadius.compact,
+            padding: 12
+        )
         .accessibilityElement(children: .combine)
     }
 

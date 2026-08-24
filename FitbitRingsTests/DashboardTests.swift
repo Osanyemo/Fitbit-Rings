@@ -125,6 +125,16 @@ final class DashboardTests: XCTestCase {
         )
     }
 
+    func testWorkoutSummaryPreservesStepsThroughDetailBridge() {
+        let detail = workoutDetail(startTime: Date(timeIntervalSince1970: 900))
+
+        let summary = detail.summaryValue
+        let bridgedDetail = WorkoutDetail(summary: summary)
+
+        XCTAssertEqual(summary.steps, 1_512)
+        XCTAssertEqual(bridgedDetail.metricsSummary.steps, 1_512)
+    }
+
     func testPercentFormattingRoundsProgress() {
         XCTAssertEqual(DashboardFormatting.percent(0), "0%")
         XCTAssertEqual(DashboardFormatting.percent(0.865), "87%")
@@ -563,11 +573,12 @@ final class DashboardTests: XCTestCase {
     func testSwiftDataDashboardCacheSavesAndLoadsSplitSections() throws {
         let context = try makeInMemoryModelContext()
         let cache = SwiftDataDashboardCache(modelContext: context)
-        let summary = dashboardSnapshot(steps: 2_468, lastUpdated: Date(timeIntervalSince1970: 1_000))
+        var summary = dashboardSnapshot(steps: 2_468, lastUpdated: Date(timeIntervalSince1970: 1_000))
         let activity = cachedActivityData(loadedAt: Date(timeIntervalSince1970: 1_100))
         let workoutLoadedAt = Date(timeIntervalSince1970: 1_200)
         let workout = workoutDetail(startTime: Date(timeIntervalSince1970: 900))
         let health = cachedHealthData(loadedAt: Date(timeIntervalSince1970: 1_300))
+        summary.latestWorkout = workout.summaryValue
 
         cache.saveSummary(summary)
         cache.saveActivityData(activity)
@@ -577,10 +588,59 @@ final class DashboardTests: XCTestCase {
         let loaded = try XCTUnwrap(cache.loadFitnessData())
         XCTAssertEqual(cache.loadSummary(), summary)
         XCTAssertEqual(loaded.summary, summary)
+        XCTAssertEqual(loaded.summary.latestWorkout?.steps, 1_512)
         XCTAssertEqual(loaded.activity, activity)
         XCTAssertEqual(loaded.workouts, [workout])
         XCTAssertEqual(loaded.workoutsLoadedAt, workoutLoadedAt)
         XCTAssertEqual(loaded.health, health)
+    }
+
+    @MainActor
+    func testSwiftDataDashboardCacheDecodesOldWorkoutSummaryWithoutSteps() throws {
+        let context = try makeInMemoryModelContext()
+        let cachedDate = Date(timeIntervalSince1970: 1_000)
+        let json = """
+        {
+          "date": "1970-01-01T00:16:40Z",
+          "rings": {
+            "move": { "title": "Move", "value": 320, "goal": 500, "unit": "kcal" },
+            "active": { "title": "Active", "value": 28, "goal": 30, "unit": "min" },
+            "steps": { "title": "Steps", "value": 2468, "goal": 10000, "unit": "" }
+          },
+          "activity": {
+            "steps": 2468,
+            "distanceMeters": 1851,
+            "activeCalories": 320,
+            "totalCalories": 2000,
+            "providedMetrics": ["steps", "distance", "active-energy-burned", "total-calories"]
+          },
+          "latestWorkout": {
+            "type": "Walk",
+            "startTime": "1970-01-01T00:15:00Z",
+            "durationSeconds": 1200,
+            "distanceMeters": 1140,
+            "calories": 154,
+            "averageHeartRate": 122
+          },
+          "heart": {},
+          "lastUpdated": "1970-01-01T00:16:40Z",
+          "syncState": "idle"
+        }
+        """
+        context.insert(
+            CachedDashboardSection(
+                id: "summary",
+                data: Data(json.utf8),
+                updatedAt: cachedDate
+            )
+        )
+        try context.save()
+
+        let cache = SwiftDataDashboardCache(modelContext: context)
+        let summary = try XCTUnwrap(cache.loadSummary())
+
+        XCTAssertEqual(summary.latestWorkout?.type, "Walk")
+        XCTAssertNil(summary.latestWorkout?.steps)
     }
 
     @MainActor

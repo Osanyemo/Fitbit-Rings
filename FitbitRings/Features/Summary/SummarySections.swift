@@ -35,7 +35,7 @@ struct TodayGoalsSection: View {
                         } label: {
                             FitnessGoalCard(card: card)
                         }
-                        .buttonStyle(SummaryInteractiveCardButtonStyle())
+                        .buttonStyle(DashboardInteractiveCardButtonStyle())
                         .accessibilityHint("Opens details")
                     }
                 }
@@ -191,7 +191,7 @@ struct RecentWorkoutSection: View {
             } label: {
                 VStack(alignment: .leading, spacing: 14) {
                     HStack(alignment: .center, spacing: 12) {
-                        MetricBadge(systemImage: "dumbbell.fill", accentColor: .activeRing, size: 44)
+                        DashboardMetricBadge(systemImage: "dumbbell.fill", accentColor: .activeRing, size: 44)
 
                         VStack(alignment: .leading, spacing: 4) {
                             Text(workout.type)
@@ -209,7 +209,7 @@ struct RecentWorkoutSection: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
 
                         if onSelect != nil {
-                            SummaryActionIndicator(accentColor: .activeRing, size: 30)
+                            DashboardActionIndicator(accentColor: .activeRing, size: 30)
                         }
                     }
 
@@ -233,20 +233,14 @@ struct RecentWorkoutSection: View {
                         }
 
                         if !workoutStats.isEmpty {
-                            RecentWorkoutStatsRow(stats: workoutStats)
+                            DashboardCardStatRow(stats: workoutStats)
                         }
                     }
                 }
-                .padding(15)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(.summarySurface, in: RoundedRectangle(cornerRadius: DashboardCardRadius.tile, style: .continuous))
-                .overlay {
-                    RoundedRectangle(cornerRadius: DashboardCardRadius.tile, style: .continuous)
-                        .stroke(workoutBorder, lineWidth: 1)
-                }
+                .dashboardCard(border: workoutBorder, padding: 15)
                 .accessibilityElement(children: .combine)
             }
-            .buttonStyle(SummaryInteractiveCardButtonStyle())
+            .buttonStyle(DashboardInteractiveCardButtonStyle())
             .disabled(onSelect == nil)
             .accessibilityHint(onSelect == nil ? "" : "Opens workout details")
         }
@@ -256,12 +250,22 @@ struct RecentWorkoutSection: View {
         DashboardFormatting.durationParts(workout.durationSeconds)
     }
 
-    private var workoutStats: [RecentWorkoutStat] {
-        var stats: [RecentWorkoutStat] = []
+    private var workoutStats: [DashboardCardStat] {
+        var stats: [DashboardCardStat] = []
+
+        if let steps = workout.steps {
+            stats.append(
+                DashboardCardStat(
+                    id: "steps",
+                    text: DashboardFormatting.integer(Double(steps)),
+                    systemImage: "shoeprints.fill"
+                )
+            )
+        }
 
         if let distance = workout.distanceMeters {
             stats.append(
-                RecentWorkoutStat(
+                DashboardCardStat(
                     id: "distance",
                     text: DashboardFormatting.distance(distance, unit: units.distanceUnit),
                     systemImage: "map"
@@ -271,7 +275,7 @@ struct RecentWorkoutSection: View {
 
         if let calories = workout.calories {
             stats.append(
-                RecentWorkoutStat(
+                DashboardCardStat(
                     id: "calories",
                     text: "\(DashboardFormatting.integer(calories)) kcal",
                     systemImage: "flame"
@@ -281,7 +285,7 @@ struct RecentWorkoutSection: View {
 
         if let heartRate = workout.averageHeartRate {
             stats.append(
-                RecentWorkoutStat(
+                DashboardCardStat(
                     id: "average-heart-rate",
                     text: "\(DashboardFormatting.integer(heartRate)) bpm",
                     systemImage: "heart.fill"
@@ -348,7 +352,7 @@ private struct FitnessGoalCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .top, spacing: 8) {
-                MetricBadge(systemImage: card.systemImage, accentColor: card.accentColor, size: 34)
+                DashboardMetricBadge(systemImage: card.systemImage, accentColor: card.accentColor, size: 34)
 
                 VStack(alignment: .leading, spacing: 3) {
                     Text(card.title)
@@ -374,26 +378,30 @@ private struct FitnessGoalCard: View {
             }
             .frame(minHeight: 46, alignment: .topLeading)
             .overlay(alignment: .topTrailing) {
-                SummaryActionIndicator(accentColor: card.accentColor, size: 28)
+                DashboardActionIndicator(accentColor: card.accentColor, size: 28)
             }
 
             Spacer(minLength: 4)
 
             VStack(alignment: .leading, spacing: 8) {
-                MetricValueText(value: card.value, unit: card.isAvailable ? card.unit : "")
+                DashboardCardValueRow(
+                    value: card.value,
+                    unit: card.isAvailable ? card.unit : "",
+                    valueFontSize: 31,
+                    animatesValue: true
+                )
 
                 if let progress = card.progress {
                     FitnessProgressBar(progress: progress, accentColor: card.accentColor)
                 }
             }
         }
-        .padding(15)
-        .frame(maxWidth: .infinity, minHeight: 154, alignment: .topLeading)
-        .background(cardBackground, in: RoundedRectangle(cornerRadius: DashboardCardRadius.tile, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: DashboardCardRadius.tile, style: .continuous)
-                .stroke(cardBorder, lineWidth: 1)
-        }
+        .dashboardCard(
+            background: cardBackground,
+            border: cardBorder,
+            padding: 15,
+            minHeight: 154
+        )
         .accessibilityElement(children: .combine)
     }
 
@@ -403,55 +411,6 @@ private struct FitnessGoalCard: View {
 
     private var cardBorder: Color {
         card.accentColor.opacity(card.isHighlighted ? 0.28 : 0.18)
-    }
-}
-
-private struct MetricBadge: View {
-    let systemImage: String
-    let accentColor: Color
-    var size: CGFloat = 50
-
-    var body: some View {
-        Image(systemName: systemImage)
-            .font(.system(size: size * 0.42, weight: .bold))
-            .symbolRenderingMode(.hierarchical)
-            .foregroundStyle(accentColor)
-            .frame(width: size, height: size)
-            .background(accentColor.opacity(0.15), in: Circle())
-    }
-}
-
-private struct MetricValueText: View {
-    let value: String
-    let unit: String
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
-    var body: some View {
-        HStack(alignment: .lastTextBaseline, spacing: 3) {
-            Text(value)
-                .font(.system(size: 31, weight: .bold, design: .rounded))
-                .monospacedDigit()
-                .contentTransition(.numericText())
-                .animation(valueAnimation, value: value)
-                .lineLimit(1)
-                .minimumScaleFactor(0.45)
-                .allowsTightening(true)
-                .layoutPriority(1)
-
-            if !unit.isEmpty {
-                Text(unit)
-                    .font(.headline.weight(.semibold))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.55)
-                    .allowsTightening(true)
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    private var valueAnimation: Animation? {
-        reduceMotion ? nil : .smooth(duration: 0.24, extraBounce: 0)
     }
 }
 
@@ -488,67 +447,6 @@ private struct FitnessProgressBar: View {
 
     private var progressAnimation: Animation? {
         reduceMotion ? nil : .smooth(duration: 0.38, extraBounce: 0)
-    }
-}
-
-private struct RecentWorkoutStat: Identifiable {
-    let id: String
-    let text: String
-    let systemImage: String
-}
-
-private struct RecentWorkoutStatsRow: View {
-    let stats: [RecentWorkoutStat]
-
-    var body: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 18) {
-            ForEach(stats) { stat in
-                RecentWorkoutStatLabel(stat: stat)
-                    .layoutPriority(1)
-            }
-        }
-        .font(.caption.weight(.semibold))
-        .foregroundStyle(.secondary)
-        .minimumScaleFactor(0.68)
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-}
-
-private struct RecentWorkoutStatLabel: View {
-    let stat: RecentWorkoutStat
-
-    var body: some View {
-        Label(stat.text, systemImage: stat.systemImage)
-            .lineLimit(1)
-            .minimumScaleFactor(0.68)
-            .allowsTightening(true)
-    }
-}
-
-private struct SummaryActionIndicator: View {
-    let accentColor: Color
-    var size: CGFloat = 28
-
-    var body: some View {
-        Image(systemName: "chevron.right")
-            .font(.system(size: max(11, size * 0.42), weight: .bold))
-            .foregroundStyle(accentColor)
-            .frame(width: size, height: size)
-            .background(accentColor.opacity(0.13), in: Circle())
-            .overlay {
-                Circle()
-                    .stroke(accentColor.opacity(0.20), lineWidth: 1)
-            }
-            .accessibilityHidden(true)
-    }
-}
-
-private struct SummaryInteractiveCardButtonStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .scaleEffect(configuration.isPressed ? 0.985 : 1)
-            .opacity(configuration.isPressed ? 0.86 : 1)
-            .animation(.smooth(duration: 0.16, extraBounce: 0), value: configuration.isPressed)
     }
 }
 

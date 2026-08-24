@@ -504,7 +504,8 @@ struct WorkoutDetail: Codable, Equatable, Identifiable, Sendable {
             durationSeconds: durationSeconds,
             distanceMeters: metricsSummary.distanceMeters,
             calories: metricsSummary.caloriesKcal,
-            averageHeartRate: metricsSummary.averageHeartRate
+            averageHeartRate: metricsSummary.averageHeartRate,
+            steps: metricsSummary.steps
         )
     }
 }
@@ -701,7 +702,7 @@ extension WorkoutDetail {
             metricsSummary: WorkoutMetricsSummary(
                 caloriesKcal: summary.calories,
                 distanceMeters: summary.distanceMeters,
-                steps: nil,
+                steps: summary.steps,
                 elevationGainMeters: nil,
                 averageHeartRate: summary.averageHeartRate,
                 maxHeartRate: nil,

@@ -437,12 +437,7 @@ private struct HealthOverviewCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(alignment: .top, spacing: 8) {
-                Image(systemName: item.systemImage)
-                    .font(.headline.weight(.bold))
-                    .symbolRenderingMode(.hierarchical)
-                    .foregroundStyle(item.accentColor)
-                    .frame(width: 32, height: 32)
-                    .background(item.accentColor.opacity(0.16), in: Circle())
+                DashboardMetricBadge(systemImage: item.systemImage, accentColor: item.accentColor, size: 32)
 
                 VStack(alignment: .leading, spacing: 3) {
                     Text(item.title)
@@ -470,31 +465,14 @@ private struct HealthOverviewCard: View {
 
             Spacer(minLength: 0)
 
-            HStack(alignment: .lastTextBaseline, spacing: 4) {
-                Text(item.value)
-                    .font(.system(size: 32, weight: .bold, design: .rounded))
-                    .monospacedDigit()
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.48)
-                    .allowsTightening(true)
-                    .layoutPriority(1)
-
-                if !item.unit.isEmpty {
-                    Text(item.unit)
-                        .font(.headline.weight(.semibold))
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.62)
-                }
-            }
+            DashboardCardValueRow(value: item.value, unit: item.unit, valueFontSize: 32)
         }
-        .padding(14)
-        .frame(maxWidth: .infinity, minHeight: 156, alignment: .topLeading)
-        .background(overviewBackground, in: RoundedRectangle(cornerRadius: DashboardCardRadius.tile, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: DashboardCardRadius.tile, style: .continuous)
-                .stroke(item.accentColor.opacity(0.18), lineWidth: 1)
-        }
+        .dashboardCard(
+            background: overviewBackground,
+            border: item.accentColor.opacity(0.18),
+            padding: 14,
+            minHeight: 156
+        )
         .accessibilityElement(children: .combine)
     }
 
@@ -690,12 +668,10 @@ private struct MetricRangeChartSection: View {
             )
             .frame(height: 300)
         }
-        .padding(16)
-        .background(.summarySurface, in: RoundedRectangle(cornerRadius: DashboardCardRadius.tile, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: DashboardCardRadius.tile, style: .continuous)
-                .stroke(type.accentColor.opacity(0.18), lineWidth: 1)
-        }
+        .dashboardCard(
+            border: type.accentColor.opacity(0.18),
+            padding: 16
+        )
     }
 
     private var loadingCard: some View {
@@ -707,12 +683,11 @@ private struct MetricRangeChartSection: View {
                 .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(16)
-        .background(.summarySurface, in: RoundedRectangle(cornerRadius: DashboardCardRadius.compact, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: DashboardCardRadius.compact, style: .continuous)
-                .stroke(.dashboardStroke, lineWidth: 1)
-        }
+        .dashboardCard(
+            border: .dashboardStroke,
+            radius: DashboardCardRadius.compact,
+            padding: 16
+        )
     }
 
     private var summaryTitle: String {
@@ -787,12 +762,10 @@ private struct MetricTrendChartSection: View {
             )
             .frame(height: 260)
         }
-        .padding(16)
-        .background(.summarySurface, in: RoundedRectangle(cornerRadius: DashboardCardRadius.tile, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: DashboardCardRadius.tile, style: .continuous)
-                .stroke(series.type.accentColor.opacity(0.18), lineWidth: 1)
-        }
+        .dashboardCard(
+            border: series.type.accentColor.opacity(0.18),
+            padding: 16
+        )
     }
 }
 
@@ -859,8 +832,10 @@ private struct SleepDetailView: View {
                                     .font(.headline.monospacedDigit())
                                     .foregroundStyle(.secondary)
                             }
-                            .padding(14)
-                            .background(.summarySurface, in: RoundedRectangle(cornerRadius: DashboardCardRadius.compact, style: .continuous))
+                            .dashboardCard(
+                                radius: DashboardCardRadius.compact,
+                                padding: 14
+                            )
                         }
                     }
                 }
@@ -1181,45 +1156,13 @@ private struct ActivityStatusPill: View {
     }
 }
 
-private struct DashboardActionIndicator: View {
-    let accentColor: Color
-    var size: CGFloat = 28
-
-    var body: some View {
-        Image(systemName: "chevron.right")
-            .font(.system(size: max(11, size * 0.42), weight: .bold))
-            .foregroundStyle(accentColor)
-            .frame(width: size, height: size)
-            .background(accentColor.opacity(0.13), in: Circle())
-            .overlay {
-                Circle()
-                    .stroke(accentColor.opacity(0.20), lineWidth: 1)
-            }
-            .accessibilityHidden(true)
-    }
-}
-
-private struct DashboardInteractiveCardButtonStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .scaleEffect(configuration.isPressed ? 0.985 : 1)
-            .opacity(configuration.isPressed ? 0.86 : 1)
-            .animation(.smooth(duration: 0.16, extraBounce: 0), value: configuration.isPressed)
-    }
-}
-
 private struct ActivityGoalTile: View {
     let insight: ActivityGoalInsight
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 8) {
-                Image(systemName: insight.systemImage)
-                    .font(.caption.weight(.bold))
-                    .symbolRenderingMode(.hierarchical)
-                    .foregroundStyle(insight.accentColor)
-                    .frame(width: 26, height: 26)
-                    .background(insight.accentColor.opacity(0.15), in: Circle())
+                DashboardMetricBadge(systemImage: insight.systemImage, accentColor: insight.accentColor, size: 26)
 
                 Text(insight.title)
                     .font(.caption.weight(.bold))
@@ -1268,13 +1211,12 @@ private struct ActivityGoalTile: View {
                     .accessibilityLabel("\(insight.title) \(insight.progressText)")
             }
         }
-        .padding(14)
-        .frame(maxWidth: .infinity, minHeight: 142, alignment: .topLeading)
-        .background(tileBackground, in: RoundedRectangle(cornerRadius: DashboardCardRadius.tile, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: DashboardCardRadius.tile, style: .continuous)
-                .stroke(tileBorder, lineWidth: 1)
-        }
+        .dashboardCard(
+            background: tileBackground,
+            border: tileBorder,
+            padding: 14,
+            minHeight: 142
+        )
         .accessibilityElement(children: .combine)
     }
 
@@ -1318,12 +1260,7 @@ struct DashboardMetricCard: View {
     private var cardContent: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .top, spacing: 7) {
-                Image(systemName: systemImage)
-                    .font(.headline.weight(.bold))
-                    .symbolRenderingMode(.hierarchical)
-                    .foregroundStyle(accentColor)
-                    .frame(width: 30, height: 30)
-                    .background(accentColor.opacity(0.15), in: Circle())
+                DashboardMetricBadge(systemImage: systemImage, accentColor: accentColor, size: 30)
 
                 Text(title)
                     .font(.subheadline.weight(.bold))
@@ -1354,24 +1291,12 @@ struct DashboardMetricCard: View {
 
             Spacer(minLength: 0)
 
-            HStack(alignment: .lastTextBaseline, spacing: 4) {
-                Text(isAvailable ? value : "No data")
-                    .font(.system(size: 30, weight: .bold, design: .rounded))
-                    .monospacedDigit()
-                    .foregroundStyle(isAvailable ? Color.primary : Color.secondary)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.46)
-                    .allowsTightening(true)
-                    .layoutPriority(1)
-
-                if isAvailable && !unit.isEmpty {
-                    Text(unit)
-                        .font(.headline.weight(.semibold))
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.64)
-                }
-            }
+            DashboardCardValueRow(
+                value: isAvailable ? value : "No data",
+                unit: isAvailable ? unit : "",
+                valueFontSize: 30,
+                valueColor: isAvailable ? .primary : .secondary
+            )
 
             if showsChart {
                 MetricTimeChart(
@@ -1390,13 +1315,11 @@ struct DashboardMetricCard: View {
                     .accessibilityHidden(true)
             }
         }
-        .padding(14)
-        .frame(maxWidth: .infinity, minHeight: showsChartSlot ? 190 : 142, alignment: .topLeading)
-        .background(.summarySurface, in: RoundedRectangle(cornerRadius: DashboardCardRadius.tile, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: DashboardCardRadius.tile, style: .continuous)
-                .stroke(cardBorder, lineWidth: 1)
-        }
+        .dashboardCard(
+            border: cardBorder,
+            padding: 14,
+            minHeight: showsChartSlot ? 190 : 142
+        )
     }
 
     private var showsChartSlot: Bool {
@@ -1630,12 +1553,10 @@ private struct BucketDistributionCard: View {
                 }
             }
         }
-        .padding(16)
-        .background(.summarySurface, in: RoundedRectangle(cornerRadius: DashboardCardRadius.tile, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: DashboardCardRadius.tile, style: .continuous)
-                .stroke(.dashboardStroke, lineWidth: 1)
-        }
+        .dashboardCard(
+            border: .dashboardStroke,
+            padding: 16
+        )
     }
 
     private var total: Double {
@@ -1676,12 +1597,11 @@ private struct BucketList: View {
                 .font(.subheadline.weight(.semibold))
             }
         }
-        .padding(16)
-        .background(.summarySurface, in: RoundedRectangle(cornerRadius: DashboardCardRadius.compact, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: DashboardCardRadius.compact, style: .continuous)
-                .stroke(.dashboardStroke, lineWidth: 1)
-        }
+        .dashboardCard(
+            border: .dashboardStroke,
+            radius: DashboardCardRadius.compact,
+            padding: 16
+        )
     }
 }
 
@@ -1716,12 +1636,7 @@ private struct HealthSleepSessionCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(alignment: .top, spacing: 8) {
-                Image(systemName: "moon.zzz.fill")
-                    .font(.headline.weight(.bold))
-                    .symbolRenderingMode(.hierarchical)
-                    .foregroundStyle(.sleepAccent)
-                    .frame(width: 34, height: 34)
-                    .background(Color.sleepAccent.opacity(0.16), in: Circle())
+                DashboardMetricBadge(systemImage: "moon.zzz.fill", accentColor: .sleepAccent, size: 34)
 
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Sleep")
@@ -1744,33 +1659,16 @@ private struct HealthSleepSessionCard: View {
                 DashboardActionIndicator(accentColor: .sleepAccent, size: 30)
             }
 
-            HStack(alignment: .lastTextBaseline, spacing: 4) {
-                Text(duration.value)
-                    .font(.system(size: 34, weight: .bold, design: .rounded))
-                    .monospacedDigit()
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.54)
-                    .allowsTightening(true)
-                    .layoutPriority(1)
-
-                if !duration.unit.isEmpty {
-                    Text(duration.unit)
-                        .font(.headline.weight(.semibold))
-                        .foregroundStyle(.secondary)
-                }
-            }
+            DashboardCardValueRow(value: duration.value, unit: duration.unit, valueFontSize: 34)
 
             if !session.displayStages.isEmpty {
                 SleepStageStrip(stages: session.displayStages)
             }
         }
-        .padding(15)
-        .frame(maxWidth: .infinity, alignment: .topLeading)
-        .background(.summarySurface, in: RoundedRectangle(cornerRadius: DashboardCardRadius.tile, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: DashboardCardRadius.tile, style: .continuous)
-                .stroke(Color.sleepAccent.opacity(0.18), lineWidth: 1)
-        }
+        .dashboardCard(
+            border: Color.sleepAccent.opacity(0.18),
+            padding: 15
+        )
         .accessibilityElement(children: .combine)
         .accessibilityHint("Opens sleep details")
     }
@@ -1930,12 +1828,7 @@ private struct WorkoutRowCard: View {
     private var cardContent: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack(alignment: .top, spacing: 12) {
-                Image(systemName: "dumbbell.fill")
-                    .font(.system(size: 18, weight: .bold))
-                    .symbolRenderingMode(.hierarchical)
-                    .foregroundStyle(.activeRing)
-                    .frame(width: 44, height: 44)
-                    .background(.activeRing.opacity(0.15), in: Circle())
+                DashboardMetricBadge(systemImage: "dumbbell.fill", accentColor: .activeRing, size: 44)
 
                 VStack(alignment: .leading, spacing: 4) {
                     Text(workout.type)
@@ -1964,48 +1857,30 @@ private struct WorkoutRowCard: View {
             }
 
             VStack(alignment: .leading, spacing: 6) {
-                HStack(alignment: .lastTextBaseline, spacing: 4) {
-                    Text(duration.value)
-                        .font(.system(size: 34, weight: .bold, design: .rounded))
-                        .monospacedDigit()
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.50)
-                        .allowsTightening(true)
-                        .layoutPriority(1)
-
-                    if !duration.unit.isEmpty {
-                        Text(duration.unit)
-                            .font(.headline.weight(.semibold))
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.64)
-                    }
-                }
+                DashboardCardValueRow(value: duration.value, unit: duration.unit, valueFontSize: 34)
 
                 if !stats.isEmpty {
-                    WorkoutStatsRow(stats: stats)
+                    DashboardCardStatRow(stats: stats)
                 }
             }
         }
-        .padding(15)
-        .frame(maxWidth: .infinity, minHeight: 148, alignment: .topLeading)
-        .background(.summarySurface, in: RoundedRectangle(cornerRadius: DashboardCardRadius.tile, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: DashboardCardRadius.tile, style: .continuous)
-                .stroke(cardBorder, lineWidth: 1)
-        }
+        .dashboardCard(
+            border: cardBorder,
+            padding: 15,
+            minHeight: 148
+        )
     }
 
     private var duration: DashboardFormatting.MetricValue {
         DashboardFormatting.durationParts(workout.durationSeconds)
     }
 
-    private var stats: [WorkoutStat] {
-        var stats: [WorkoutStat] = []
+    private var stats: [DashboardCardStat] {
+        var stats: [DashboardCardStat] = []
 
         if let steps = workout.metricsSummary.steps {
             stats.append(
-                WorkoutStat(
+                DashboardCardStat(
                     id: "steps",
                     text: DashboardFormatting.integer(Double(steps)),
                     systemImage: "shoeprints.fill"
@@ -2015,7 +1890,7 @@ private struct WorkoutRowCard: View {
 
         if let distance = workout.metricsSummary.distanceMeters {
             stats.append(
-                WorkoutStat(
+                DashboardCardStat(
                     id: "distance",
                     text: DashboardFormatting.distance(distance, unit: units.distanceUnit),
                     systemImage: "map"
@@ -2025,7 +1900,7 @@ private struct WorkoutRowCard: View {
 
         if let calories = workout.metricsSummary.caloriesKcal {
             stats.append(
-                WorkoutStat(
+                DashboardCardStat(
                     id: "calories",
                     text: "\(DashboardFormatting.integer(calories)) kcal",
                     systemImage: "flame"
@@ -2035,7 +1910,7 @@ private struct WorkoutRowCard: View {
 
         if let heartRate = workout.metricsSummary.averageHeartRate {
             stats.append(
-                WorkoutStat(
+                DashboardCardStat(
                     id: "average-heart-rate",
                     text: "\(DashboardFormatting.integer(heartRate)) bpm",
                     systemImage: "heart.fill"
@@ -2048,51 +1923,6 @@ private struct WorkoutRowCard: View {
 
     private var cardBorder: Color {
         onSelect == nil ? Color.dashboardStroke : Color.activeRing.opacity(0.20)
-    }
-}
-
-private struct WorkoutStat: Identifiable {
-    let id: String
-    let text: String
-    let systemImage: String
-}
-
-private struct WorkoutStatsRow: View {
-    let stats: [WorkoutStat]
-
-    private let wrappedColumns = [
-        GridItem(.adaptive(minimum: 92), spacing: 12, alignment: .leading)
-    ]
-
-    var body: some View {
-        ViewThatFits(in: .horizontal) {
-            HStack(alignment: .firstTextBaseline, spacing: 18) {
-                ForEach(stats) { stat in
-                    WorkoutStatLabel(stat: stat)
-                        .fixedSize(horizontal: true, vertical: false)
-                }
-            }
-
-            LazyVGrid(columns: wrappedColumns, alignment: .leading, spacing: 6) {
-                ForEach(stats) { stat in
-                    WorkoutStatLabel(stat: stat)
-                }
-            }
-        }
-        .font(.caption.weight(.semibold))
-        .foregroundStyle(.secondary)
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-}
-
-private struct WorkoutStatLabel: View {
-    let stat: WorkoutStat
-
-    var body: some View {
-        Label(stat.text, systemImage: stat.systemImage)
-            .lineLimit(1)
-            .minimumScaleFactor(0.72)
-            .allowsTightening(true)
     }
 }
 
@@ -2159,9 +1989,11 @@ private struct WorkoutSplitsSection: View {
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(.secondary)
                 }
-                .padding(14)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(.summarySurface, in: RoundedRectangle(cornerRadius: DashboardCardRadius.compact, style: .continuous))
+                .dashboardCard(
+                    radius: DashboardCardRadius.compact,
+                    padding: 14,
+                    alignment: .leading
+                )
             }
         }
     }
@@ -2207,9 +2039,11 @@ private struct MetricPointRow: View {
                 valueText
             }
         }
-        .padding(14)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.summarySurface, in: RoundedRectangle(cornerRadius: DashboardCardRadius.compact, style: .continuous))
+        .dashboardCard(
+            radius: DashboardCardRadius.compact,
+            padding: 14,
+            alignment: .leading
+        )
     }
 
     private var dateText: some View {
@@ -2562,31 +2396,6 @@ private struct MetricTimeChart: View {
     }
 }
 
-private struct DashboardEmptyState: View {
-    let title: String
-    let systemImage: String
-
-    var body: some View {
-        HStack(spacing: 12) {
-            Image(systemName: systemImage)
-                .font(.headline.weight(.bold))
-                .foregroundStyle(.secondary)
-                .frame(width: 28, height: 28)
-
-            Text(title)
-                .font(.headline.weight(.semibold))
-                .foregroundStyle(.secondary)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(16)
-        .background(.summarySurface, in: RoundedRectangle(cornerRadius: DashboardCardRadius.compact, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: DashboardCardRadius.compact, style: .continuous)
-                .stroke(.dashboardStroke, lineWidth: 1)
-        }
-    }
-}
-
 private struct DashboardScrollEdgeFade: View {
     enum Edge {
         case top
@@ -2909,7 +2718,8 @@ private extension FitnessDataSnapshot {
                 durationSeconds: 2_340,
                 distanceMeters: 3_120,
                 calories: 242,
-                averageHeartRate: 122
+                averageHeartRate: 122,
+                steps: 4_210
             ),
             heart: HeartSummary(
                 mostRecentHeartRate: 86,

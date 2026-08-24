@@ -154,12 +154,11 @@ private struct ActivityTopBand: View {
             ActivityHeroPanel(rings: snapshot.rings)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(18)
-        .background(Color.activityHeaderSurface, in: RoundedRectangle(cornerRadius: DashboardCardRadius.tile, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: DashboardCardRadius.tile, style: .continuous)
-                .stroke(.dashboardStroke, lineWidth: 1)
-        }
+        .dashboardCard(
+            background: .activityHeaderSurface,
+            border: .dashboardStroke,
+            padding: 18
+        )
     }
 }
 
@@ -466,12 +465,12 @@ private struct SyncStatusBanner: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(14)
-        .background(background, in: RoundedRectangle(cornerRadius: DashboardCardRadius.compact, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: DashboardCardRadius.compact, style: .continuous)
-                .stroke(border, lineWidth: 1)
-        }
+        .dashboardCard(
+            background: background,
+            border: border,
+            radius: DashboardCardRadius.compact,
+            padding: 14
+        )
         .transition(.opacity.combined(with: .move(edge: .top)))
     }
 }
@@ -554,7 +553,8 @@ private extension DashboardSnapshot {
                 durationSeconds: 2_340,
                 distanceMeters: 3_120,
                 calories: 242,
-                averageHeartRate: 122
+                averageHeartRate: 122,
+                steps: 4_210
             ),
             heart: HeartSummary(
                 mostRecentHeartRate: 86,

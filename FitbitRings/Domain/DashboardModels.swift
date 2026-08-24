@@ -75,6 +75,7 @@ struct WorkoutSummary: Equatable, Sendable {
     var distanceMeters: Double?
     var calories: Double?
     var averageHeartRate: Double? = nil
+    var steps: Int? = nil
 }
 
 struct HeartSummary: Equatable, Sendable {
