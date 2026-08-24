@@ -133,6 +133,10 @@ final class GoogleHealthDecodingTests: XCTestCase {
                                         activeMinutesSum: GoogleHealthNumericValue(10)
                                     ),
                                     GoogleHealthActiveMinutesByActivityLevel(
+                                        activityLevel: "MODERATE",
+                                        activeMinutesSum: GoogleHealthNumericValue(7)
+                                    ),
+                                    GoogleHealthActiveMinutesByActivityLevel(
                                         activityLevel: "VIGOROUS",
                                         activeMinutesSum: GoogleHealthNumericValue(5)
                                     )
@@ -185,12 +189,42 @@ final class GoogleHealthDecodingTests: XCTestCase {
         )
 
         XCTAssertEqual(snapshot.activity.steps, 7_842)
-        XCTAssertEqual(snapshot.rings.active.value, 15)
+        XCTAssertEqual(snapshot.rings.active.value, 12)
         XCTAssertEqual(snapshot.activity.activeCalories, 325)
         XCTAssertEqual(snapshot.activity.distanceMeters, 4_500)
         XCTAssertEqual(snapshot.activity.totalCalories, 2_180)
         XCTAssertTrue(snapshot.activity.hasData(for: .steps))
         XCTAssertTrue(snapshot.activity.hasData(for: .distance))
+    }
+
+    func testMapperTreatsLightOnlyActiveMinutesAsProvidedZeroExerciseMinutes() throws {
+        let snapshot = GoogleHealthMapper.map(
+            goals: .defaultGoals,
+            date: Date(timeIntervalSince1970: 0),
+            rollups: [
+                .activeMinutes: GoogleHealthRollUpResponse(
+                    rollupDataPoints: [
+                        GoogleHealthRollupDataPoint(
+                            activeMinutes: GoogleHealthActiveMinutesRollup(
+                                activeMinutesRollupByActivityLevel: [
+                                    GoogleHealthActiveMinutesByActivityLevel(
+                                        activityLevel: "LIGHT",
+                                        activeMinutesSum: GoogleHealthNumericValue(45)
+                                    )
+                                ]
+                            )
+                        )
+                    ]
+                )
+            ],
+            latestWorkout: nil,
+            latestHeartRate: nil,
+            restingHeartRate: nil,
+            sleep: nil
+        )
+
+        XCTAssertEqual(snapshot.rings.active.value, 0)
+        XCTAssertTrue(snapshot.activity.hasData(for: .activeMinutes))
     }
 
     func testMapperDistinguishesMissingValuesFromProvidedZero() throws {
@@ -583,6 +617,10 @@ final class GoogleHealthDecodingTests: XCTestCase {
                                         activeMinutesSum: GoogleHealthNumericValue(12)
                                     ),
                                     GoogleHealthActiveMinutesByActivityLevel(
+                                        activityLevel: "MODERATE",
+                                        activeMinutesSum: GoogleHealthNumericValue(6)
+                                    ),
+                                    GoogleHealthActiveMinutesByActivityLevel(
                                         activityLevel: "VIGOROUS",
                                         activeMinutesSum: GoogleHealthNumericValue(8)
                                     )
@@ -603,8 +641,9 @@ final class GoogleHealthDecodingTests: XCTestCase {
 
         XCTAssertEqual(activeCalories.latestPoint?.startDate, today)
         XCTAssertEqual(activeCalories.latestPoint?.value, 210)
+        XCTAssertEqual(activeMinutes.points.first?.value, 0)
         XCTAssertEqual(activeMinutes.latestPoint?.startDate, today)
-        XCTAssertEqual(activeMinutes.latestPoint?.value, 20)
+        XCTAssertEqual(activeMinutes.latestPoint?.value, 14)
     }
 
     func testActivityMapperReplacesExistingCurrentDayDistancePoint() throws {

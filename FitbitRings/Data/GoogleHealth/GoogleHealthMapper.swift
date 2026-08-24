@@ -295,12 +295,7 @@ enum GoogleHealthMapper {
         case .steps:
             return summed(dataPoints.compactMap { $0.steps?.countSum?.doubleValue })
         case .activeMinutes:
-            return summed(
-                dataPoints
-                    .compactMap(\.activeMinutes)
-                    .flatMap(\.activeMinutesRollupByActivityLevel)
-                    .compactMap { $0.activeMinutesSum?.doubleValue }
-            )
+            return summed(dataPoints.compactMap { exerciseMinutes(from: $0.activeMinutes) })
         case .activeEnergyBurned:
             return summed(dataPoints.compactMap { $0.activeEnergyBurned?.kcalSum })
         case .distance:
@@ -465,9 +460,7 @@ enum GoogleHealthMapper {
         case .steps:
             return point.steps?.countSum?.doubleValue
         case .activeMinutes:
-            let values = point.activeMinutes?.activeMinutesRollupByActivityLevel
-                .compactMap { $0.activeMinutesSum?.doubleValue } ?? []
-            return values.isEmpty ? nil : values.reduce(0, +)
+            return exerciseMinutes(from: point.activeMinutes)
         case .activeEnergyBurned:
             return point.activeEnergyBurned?.kcalSum
         case .distance:
@@ -693,6 +686,30 @@ enum GoogleHealthMapper {
             return "Vigorous"
         default:
             return value.displayNameFromEnum
+        }
+    }
+
+    private static func exerciseMinutes(from rollup: GoogleHealthActiveMinutesRollup?) -> Double? {
+        guard let buckets = rollup?.activeMinutesRollupByActivityLevel,
+              buckets.contains(where: { $0.activeMinutesSum != nil }) else {
+            return nil
+        }
+
+        return buckets.reduce(0) { total, bucket in
+            guard isExerciseActivityLevel(bucket.activityLevel) else {
+                return total
+            }
+            return total + (bucket.activeMinutesSum?.doubleValue ?? 0)
+        }
+    }
+
+    private static func isExerciseActivityLevel(_ value: String?) -> Bool {
+        guard let value else { return false }
+        switch normalizedBucketKey(value) {
+        case "MODERATE", "MODERATELY_ACTIVE", "VIGOROUS", "VERY_ACTIVE":
+            return true
+        default:
+            return false
         }
     }
 
