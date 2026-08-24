@@ -136,6 +136,86 @@ enum GoogleHealthMapper {
             ?? NumericMetricSeries(type: type, points: [], rangeStart: range.start, rangeEnd: range.end)
     }
 
+    static func mapChartSeries(
+        _ type: GoogleHealthDataType,
+        range: MetricChartRange,
+        response: GoogleHealthRollUpResponse,
+        displayRange: DateInterval,
+        calendar: Calendar = .current
+    ) -> MetricChartSeries {
+        let series = numericSeries(type, from: response, fallbackRange: displayRange, calendar: calendar)
+            ?? NumericMetricSeries(type: type, points: [], rangeStart: displayRange.start, rangeEnd: displayRange.end)
+
+        return MetricChartSeries(
+            type: type,
+            range: range,
+            points: series.points,
+            rangeStart: displayRange.start,
+            rangeEnd: displayRange.end,
+            representedDayCount: range == .day ? nil : series.points.count
+        )
+    }
+
+    static func mapYearChartSeries(
+        _ type: GoogleHealthDataType,
+        responses: [GoogleHealthRollUpResponse],
+        displayRange: DateInterval,
+        calendar: Calendar = .current
+    ) -> MetricChartSeries {
+        struct MonthAggregate {
+            var startDate: Date
+            var value: Double
+            var representedDays: Int
+        }
+
+        var orderedMonths: [Date] = []
+        var valuesByMonth: [Date: MonthAggregate] = [:]
+        var representedDays = 0
+
+        let dailyPoints = responses.flatMap { response in
+            numericSeries(type, from: response, fallbackRange: nil, calendar: calendar)?.points ?? []
+        }
+
+        for point in dailyPoints {
+            guard let monthStart = calendar.dateInterval(of: .month, for: point.startDate)?.start else {
+                continue
+            }
+
+            if valuesByMonth[monthStart] == nil {
+                orderedMonths.append(monthStart)
+                valuesByMonth[monthStart] = MonthAggregate(startDate: monthStart, value: 0, representedDays: 0)
+            }
+
+            valuesByMonth[monthStart]?.value += point.value
+            valuesByMonth[monthStart]?.representedDays += 1
+            representedDays += 1
+        }
+
+        let points = orderedMonths.sorted().compactMap { monthStart -> NumericMetricPoint? in
+            guard let aggregate = valuesByMonth[monthStart] else {
+                return nil
+            }
+
+            let monthEnd = calendar.dateInterval(of: .month, for: aggregate.startDate)?.end
+            return NumericMetricPoint(
+                id: "\(type.rawValue)-\(MetricChartRange.year.rawValue)-\(aggregate.startDate.timeIntervalSince1970)",
+                startDate: aggregate.startDate,
+                endDate: monthEnd,
+                value: aggregate.value,
+                unit: type.unit
+            )
+        }
+
+        return MetricChartSeries(
+            type: type,
+            range: .year,
+            points: points,
+            rangeStart: displayRange.start,
+            rangeEnd: displayRange.end,
+            representedDayCount: representedDays
+        )
+    }
+
     static func mapWorkouts(_ records: [GoogleHealthDataPoint]) -> [WorkoutDetail] {
         records.compactMap(workoutDetail(from:))
             .sorted { $0.startTime > $1.startTime }

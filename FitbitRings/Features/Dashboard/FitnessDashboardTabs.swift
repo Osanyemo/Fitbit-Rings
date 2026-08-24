@@ -534,118 +534,265 @@ private struct DashboardRouteDestination: View {
 private struct MetricDetailView: View {
     let type: GoogleHealthDataType
     @Bindable var store: FitnessDashboardStore
+    @State private var selectedRange: MetricChartRange = .day
 
     var body: some View {
         let series = store.series(for: type)
 
         DashboardScrollView(
             title: type.displayName,
-            subtitle: series?.rangeSubtitle ?? "Last 14 days",
+            subtitle: detailSubtitle(fallback: series),
             state: store.sectionState(type.category == .activity ? .activity : .health),
             showsNavigationBackButton: true,
             onRefresh: {
-                await store.refreshSection(type.category == .activity ? .activity : .health)
+                if type.supportsDetailedChartRollups {
+                    await store.loadMetricChart(type, range: selectedRange, force: true)
+                } else {
+                    await store.refreshSection(type.category == .activity ? .activity : .health)
+                }
             }
         ) {
             VStack(alignment: .leading, spacing: 22) {
-                DashboardMetricCard(
-                    title: "Latest",
-                    value: latestValue(for: series),
-                    unit: latestUnit(for: series),
-                    subtitle: latestSubtitle(for: series),
-                    systemImage: type.symbolName,
-                    accentColor: type.accentColor,
-                    points: latestCardPoints(fallback: series),
-                    isAvailable: latestIsAvailable(fallback: series)
-                )
-
-                if let series, !series.points.isEmpty {
-                    MetricPointList(series: series, units: store.preferences.units)
-                } else {
-                    DashboardEmptyState(title: "No data", systemImage: type.symbolName)
-                }
-
-                Button {
-                    Task {
-                        await store.loadEarlierMetric(type)
+                if type.supportsDetailedChartRollups {
+                    MetricRangeChartSection(
+                        type: type,
+                        selectedRange: $selectedRange,
+                        series: store.chartSeries(for: type, range: selectedRange),
+                        isLoading: store.sectionState(.activity).phase == .loading,
+                        units: store.preferences.units
+                    )
+                    .task(id: "\(type.rawValue)-\(selectedRange.rawValue)") {
+                        await store.loadMetricChart(type, range: selectedRange)
                     }
-                } label: {
-                    Label("Load Earlier", systemImage: "clock.arrow.circlepath")
-                        .frame(maxWidth: .infinity)
+
+                    if let series, !series.points.isEmpty {
+                        MetricPointList(series: series, units: store.preferences.units)
+                    }
+                } else {
+                    if let series, !series.points.isEmpty {
+                        MetricTrendChartSection(
+                            series: series,
+                            units: store.preferences.units
+                        )
+
+                        MetricPointList(series: series, units: store.preferences.units)
+                    } else {
+                        DashboardEmptyState(title: "No data", systemImage: type.symbolName)
+                    }
+
+                    Button {
+                        Task {
+                            await store.loadEarlierMetric(type)
+                        }
+                    } label: {
+                        Label("Load Earlier", systemImage: "clock.arrow.circlepath")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.large)
+                    .disabled(series?.points.isEmpty != false)
                 }
-                .buttonStyle(.bordered)
-                .controlSize(.large)
-                .disabled(series?.points.isEmpty != false)
             }
         }
     }
 
-    private func latestValue(for series: NumericMetricSeries?) -> String {
-        if let todayActivityValue {
-            return todayActivityValue.value
+    private func detailSubtitle(fallback series: NumericMetricSeries?) -> String {
+        if type.supportsDetailedChartRollups,
+           let chartSeries = store.chartSeries(for: type, range: selectedRange) {
+            return chartSeries.rangeSubtitle
         }
 
-        guard let point = series?.latestPoint else {
-            return "No data"
+        return series?.rangeSubtitle ?? "Last 14 days"
+    }
+}
+
+private struct MetricRangeChartSection: View {
+    let type: GoogleHealthDataType
+    @Binding var selectedRange: MetricChartRange
+    let series: MetricChartSeries?
+    let isLoading: Bool
+    let units: UnitPreferences
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Picker("Range", selection: $selectedRange) {
+                ForEach(MetricChartRange.allCases) { range in
+                    Text(range.shortTitle).tag(range)
+                }
+            }
+            .pickerStyle(.segmented)
+
+            if let series {
+                if series.points.isEmpty {
+                    DashboardEmptyState(title: "No \(selectedRange.title.lowercased()) data", systemImage: type.symbolName)
+                } else {
+                    chartCard(series)
+                }
+            } else if isLoading {
+                loadingCard
+            } else {
+                DashboardEmptyState(title: "No \(selectedRange.title.lowercased()) data", systemImage: type.symbolName)
+            }
         }
-        return DashboardFormatting.metricValue(point.value, type: type, units: store.preferences.units).value
     }
 
-    private func latestUnit(for series: NumericMetricSeries?) -> String {
-        if let todayActivityValue {
-            return todayActivityValue.unit
-        }
+    private func chartCard(_ series: MetricChartSeries) -> some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack(alignment: .top, spacing: 12) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(summaryTitle)
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(.secondary)
+                        .tracking(1.1)
 
-        guard let point = series?.latestPoint else {
-            return ""
-        }
-        return DashboardFormatting.metricValue(point.value, type: type, units: store.preferences.units).unit
-    }
+                    HStack(alignment: .lastTextBaseline, spacing: 4) {
+                        Text(summaryValue(for: series).value)
+                            .font(.system(size: 34, weight: .bold, design: .rounded))
+                            .monospacedDigit()
+                            .foregroundStyle(type.accentColor)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.50)
+                            .allowsTightening(true)
 
-    private func latestSubtitle(for series: NumericMetricSeries?) -> String? {
-        if usesTodayActivityPresentation, todayActivityValue != nil {
-            return "Recorded \(DashboardFormatting.compactDayLabel(for: store.snapshot.summary.date))"
-        }
+                        let unit = summaryValue(for: series).unit
+                        if !unit.isEmpty {
+                            Text(unit)
+                                .font(.title3.weight(.semibold))
+                                .foregroundStyle(type.accentColor)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.70)
+                        }
+                    }
+                }
 
-        return series?.latestPoint.map { "Recorded \($0.dashboardDateLabel(for: type))" }
-    }
+                Spacer(minLength: 8)
 
-    private func latestCardPoints(fallback series: NumericMetricSeries?) -> [NumericMetricPoint] {
-        guard usesTodayActivityPresentation else {
-            return series?.points ?? []
-        }
+                Text(series.rangeSubtitle)
+                    .font(.headline.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.trailing)
+                    .minimumScaleFactor(0.72)
+                    .allowsTightening(true)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
 
-        return store.snapshot.activity.hourlySeries(for: type)?.points ?? []
-    }
-
-    private func latestIsAvailable(fallback series: NumericMetricSeries?) -> Bool {
-        guard usesTodayActivityPresentation else {
-            return series?.latestPoint != nil
-        }
-
-        return todayActivityValue != nil
-    }
-
-    private var todayActivityValue: DashboardFormatting.MetricValue? {
-        let activity = store.snapshot.summary.activity
-        switch type {
-        case .steps where activity.hasData(for: .steps):
-            return DashboardFormatting.MetricValue(
-                value: DashboardFormatting.integer(Double(activity.steps)),
-                unit: "steps"
+            MetricTimeChart(
+                points: series.points,
+                color: type.accentColor,
+                range: series.range,
+                rangeStart: series.rangeStart,
+                rangeEnd: series.rangeEnd,
+                mode: .full,
+                style: .bar,
+                axisLabel: { value in
+                    DashboardFormatting.metricValue(value, type: type, units: units).value
+                }
             )
-        case .distance where activity.hasData(for: .distance):
-            return DashboardFormatting.distanceParts(
-                activity.distanceMeters,
-                unit: store.preferences.units.distanceUnit
-            )
-        default:
-            return nil
+            .frame(height: 300)
+        }
+        .padding(16)
+        .background(.summarySurface, in: RoundedRectangle(cornerRadius: DashboardCardRadius.tile, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: DashboardCardRadius.tile, style: .continuous)
+                .stroke(type.accentColor.opacity(0.18), lineWidth: 1)
         }
     }
 
-    private var usesTodayActivityPresentation: Bool {
-        type == .steps || type == .distance
+    private var loadingCard: some View {
+        HStack(spacing: 12) {
+            ProgressView()
+                .controlSize(.small)
+            Text("Loading \(selectedRange.title.lowercased())")
+                .font(.headline.weight(.semibold))
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(16)
+        .background(.summarySurface, in: RoundedRectangle(cornerRadius: DashboardCardRadius.compact, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: DashboardCardRadius.compact, style: .continuous)
+                .stroke(.dashboardStroke, lineWidth: 1)
+        }
+    }
+
+    private var summaryTitle: String {
+        selectedRange == .day ? "TOTAL" : "DAILY AVERAGE"
+    }
+
+    private func summaryValue(for series: MetricChartSeries) -> DashboardFormatting.MetricValue {
+        let value = selectedRange == .day
+            ? series.totalValue
+            : series.averageDailyValue ?? series.totalValue
+        return DashboardFormatting.metricValue(value, type: type, units: units)
+    }
+}
+
+private struct MetricTrendChartSection: View {
+    let series: NumericMetricSeries
+    let units: UnitPreferences
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack(alignment: .top, spacing: 12) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("RECENT TREND")
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(.secondary)
+                        .tracking(1.1)
+
+                    if let latest = series.latestPoint {
+                        let value = DashboardFormatting.metricValue(latest.value, type: series.type, units: units)
+                        HStack(alignment: .lastTextBaseline, spacing: 4) {
+                            Text(value.value)
+                                .font(.system(size: 32, weight: .bold, design: .rounded))
+                                .monospacedDigit()
+                                .foregroundStyle(series.type.accentColor)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.50)
+                                .allowsTightening(true)
+
+                            if !value.unit.isEmpty {
+                                Text(value.unit)
+                                    .font(.title3.weight(.semibold))
+                                    .foregroundStyle(series.type.accentColor)
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.70)
+                            }
+                        }
+                    }
+                }
+
+                Spacer(minLength: 8)
+
+                Text(series.rangeSubtitle)
+                    .font(.headline.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.trailing)
+                    .minimumScaleFactor(0.72)
+                    .allowsTightening(true)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            MetricTimeChart(
+                points: series.points,
+                color: series.type.accentColor,
+                range: nil,
+                rangeStart: series.rangeStart,
+                rangeEnd: series.rangeEnd,
+                mode: .full,
+                style: .line,
+                axisLabel: { value in
+                    DashboardFormatting.metricValue(value, type: series.type, units: units).value
+                }
+            )
+            .frame(height: 260)
+        }
+        .padding(16)
+        .background(.summarySurface, in: RoundedRectangle(cornerRadius: DashboardCardRadius.tile, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: DashboardCardRadius.tile, style: .continuous)
+                .stroke(series.type.accentColor.opacity(0.18), lineWidth: 1)
+        }
     }
 }
 
@@ -1148,6 +1295,8 @@ struct DashboardMetricCard: View {
     let systemImage: String
     let accentColor: Color
     var points: [NumericMetricPoint] = []
+    var chartSeries: MetricChartSeries?
+    var chartStyle: MetricChartStyle = .bar
     var reservesChartSpace = false
     var isAvailable = true
     var onSelect: (() -> Void)?
@@ -1225,7 +1374,15 @@ struct DashboardMetricCard: View {
             }
 
             if showsChart {
-                MetricBarChart(points: points, color: accentColor)
+                MetricTimeChart(
+                    points: chartPoints,
+                    color: accentColor,
+                    range: chartSeries?.range,
+                    rangeStart: chartSeries?.rangeStart,
+                    rangeEnd: chartSeries?.rangeEnd,
+                    mode: .compact,
+                    style: chartStyle
+                )
                     .frame(height: 42)
             } else if reservesChartSpace {
                 Color.clear
@@ -1247,11 +1404,15 @@ struct DashboardMetricCard: View {
     }
 
     private var showsChart: Bool {
-        points.count > 1
+        chartPoints.count > 1
     }
 
     private var cardBorder: Color {
         onSelect == nil ? Color.dashboardStroke : accentColor.opacity(0.20)
+    }
+
+    private var chartPoints: [NumericMetricPoint] {
+        chartSeries?.points ?? points
     }
 }
 
@@ -1376,6 +1537,7 @@ private struct HealthSeriesCard: View {
             systemImage: series.type.symbolName,
             accentColor: series.type.accentColor,
             points: chartPoints,
+            chartStyle: .line,
             reservesChartSpace: reservesChartSpace,
             isAvailable: series.latestPoint != nil
         ) {
@@ -2069,30 +2231,63 @@ private struct MetricPointRow: View {
     }
 }
 
-private struct MetricBarChart: View {
+private struct MetricTimeChart: View {
+    enum Mode {
+        case compact
+        case full
+    }
+
+    private struct AxisTick: Identifiable {
+        var id: String { label }
+        let label: String
+        let date: Date
+    }
+
     let points: [NumericMetricPoint]
     let color: Color
+    var range: MetricChartRange?
+    var rangeStart: Date?
+    var rangeEnd: Date?
+    var mode: Mode
+    var style: MetricChartStyle
+    var axisLabel: (Double) -> String = { value in
+        abs(value) >= 10 ? DashboardFormatting.integer(value) : String(format: "%.1f", value)
+    }
+
+    @Environment(\.calendar) private var calendar
 
     var body: some View {
         GeometryReader { geometry in
-            let chartPoints = Array(points.suffix(24))
-            let maxValue = max(chartPoints.map { max(0, $0.value) }.max() ?? 0, 1)
-            let barWidth = barWidth(in: geometry.size.width, count: chartPoints.count)
+            let chartPoints = visiblePoints
+            let domain = chartDomain(for: chartPoints)
+            let values = valueDomain(for: chartPoints)
+            let plotRect = plotRect(in: geometry.size)
+            let barWidth = barWidth(in: plotRect.width, count: expectedSlotCount(in: domain))
 
-            ZStack(alignment: .bottomLeading) {
+            ZStack(alignment: .topLeading) {
                 Path { path in
-                    let baselineY = geometry.size.height - 0.5
-                    let guideY = geometry.size.height * 0.42
-                    path.move(to: CGPoint(x: 0, y: baselineY))
-                    path.addLine(to: CGPoint(x: geometry.size.width, y: baselineY))
-                    path.move(to: CGPoint(x: 0, y: guideY))
-                    path.addLine(to: CGPoint(x: geometry.size.width, y: guideY))
+                    for position in yGuidePositions(in: plotRect) {
+                        path.move(to: CGPoint(x: plotRect.minX, y: position))
+                        path.addLine(to: CGPoint(x: plotRect.maxX, y: position))
+                    }
+
+                    for tick in xAxisTicks(in: domain) {
+                        let x = xPosition(for: tick.date, domain: domain, plotRect: plotRect)
+                        path.move(to: CGPoint(x: x, y: plotRect.minY))
+                        path.addLine(to: CGPoint(x: x, y: plotRect.maxY))
+                    }
                 }
                 .stroke(Color.dashboardStroke.opacity(0.42), style: StrokeStyle(lineWidth: 1, dash: [3, 4]))
 
-                HStack(alignment: .bottom, spacing: barSpacing(in: geometry.size.width, count: chartPoints.count)) {
+                if style == .bar {
                     ForEach(chartPoints) { point in
-                        let normalizedValue = max(0, point.value) / maxValue
+                        let normalizedValue = normalizedValue(point.value, minimum: values.minimum, maximum: values.maximum)
+                        let height = barHeight(
+                            normalizedValue: normalizedValue,
+                            value: point.value,
+                            maxHeight: plotRect.height
+                        )
+
                         RoundedRectangle(cornerRadius: min(5, barWidth / 2), style: .continuous)
                             .fill(
                                 LinearGradient(
@@ -2101,47 +2296,269 @@ private struct MetricBarChart: View {
                                     endPoint: .top
                                 )
                             )
-                            .frame(
-                                width: barWidth,
-                                height: barHeight(
-                                    normalizedValue: normalizedValue,
-                                    value: point.value,
-                                    maxHeight: geometry.size.height - 5
-                                )
+                            .frame(width: barWidth, height: height)
+                            .position(
+                                x: xPosition(for: point, domain: domain, plotRect: plotRect),
+                                y: plotRect.maxY - height / 2
                             )
                     }
+                } else {
+                    Path { path in
+                        var hasStarted = false
+                        for point in chartPoints {
+                            let location = pointLocation(
+                                for: point,
+                                domain: domain,
+                                values: values,
+                                plotRect: plotRect
+                            )
+                            if hasStarted {
+                                path.addLine(to: location)
+                            } else {
+                                path.move(to: location)
+                                hasStarted = true
+                            }
+                        }
+                    }
+                    .stroke(color.opacity(0.92), style: StrokeStyle(lineWidth: mode == .full ? 3 : 2, lineCap: .round, lineJoin: .round))
+
+                    ForEach(chartPoints) { point in
+                        Circle()
+                            .fill(color)
+                            .frame(width: mode == .full ? 7 : 4, height: mode == .full ? 7 : 4)
+                            .position(pointLocation(for: point, domain: domain, values: values, plotRect: plotRect))
+                    }
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
+
+                if mode == .full {
+                    axisLabels(values: values, domain: domain, plotRect: plotRect)
+                }
             }
         }
         .accessibilityHidden(true)
     }
 
-    private func barWidth(in width: CGFloat, count: Int) -> CGFloat {
-        guard count > 0 else { return 4 }
-        let compactSpacing = CGFloat(max(count - 1, 0)) * preferredBarSpacing(for: count)
-        let availableWidth = width - compactSpacing
-        let preferredWidth = availableWidth / CGFloat(count)
-        guard preferredWidth >= 4 else {
-            return max(2, width / CGFloat(count * 2 - 1))
+    private var visiblePoints: [NumericMetricPoint] {
+        mode == .compact ? Array(points.suffix(24)) : points
+    }
+
+    private func plotRect(in size: CGSize) -> CGRect {
+        let rightInset: CGFloat = mode == .full ? 50 : 0
+        let bottomInset: CGFloat = mode == .full ? 28 : 0
+        let topInset: CGFloat = mode == .full ? 8 : 0
+        return CGRect(
+            x: 0,
+            y: topInset,
+            width: max(1, size.width - rightInset),
+            height: max(1, size.height - topInset - bottomInset)
+        )
+    }
+
+    private func chartDomain(for points: [NumericMetricPoint]) -> (start: Date, end: Date) {
+        let start = rangeStart ?? points.first?.startDate ?? Date()
+        let rawEnd = rangeEnd ?? points.last?.endDate ?? points.last?.startDate ?? start.addingTimeInterval(1)
+        let end = rawEnd > start ? rawEnd : start.addingTimeInterval(1)
+        return (start, end)
+    }
+
+    private func valueDomain(for points: [NumericMetricPoint]) -> (minimum: Double, maximum: Double) {
+        guard !points.isEmpty else {
+            return (0, 1)
         }
-        return min(12, preferredWidth)
+
+        switch style {
+        case .bar:
+            return (0, max(points.map { max(0, $0.value) }.max() ?? 0, 1))
+        case .line:
+            let minimum = points.map(\.value).min() ?? 0
+            let maximum = points.map(\.value).max() ?? minimum + 1
+            guard maximum > minimum else {
+                return (minimum - 1, maximum + 1)
+            }
+
+            let padding = (maximum - minimum) * 0.12
+            return (minimum - padding, maximum + padding)
+        }
     }
 
-    private func barSpacing(in width: CGFloat, count: Int) -> CGFloat {
-        guard count > 1 else { return 0 }
-        let widthAfterBars = width - CGFloat(count) * barWidth(in: width, count: count)
-        let availableSpacing = widthAfterBars / CGFloat(count - 1)
-        return min(9, max(2, availableSpacing))
+    private func yGuidePositions(in plotRect: CGRect) -> [CGFloat] {
+        if mode == .compact {
+            return [plotRect.maxY - 0.5, plotRect.minY + plotRect.height * 0.42]
+        }
+
+        return [
+            plotRect.minY,
+            plotRect.minY + plotRect.height * 0.5,
+            plotRect.maxY
+        ]
     }
 
-    private func preferredBarSpacing(for count: Int) -> CGFloat {
-        count > 16 ? 5 : 7
+    private func expectedSlotCount(in domain: (start: Date, end: Date)) -> Int {
+        guard let range else {
+            return max(visiblePoints.count, 1)
+        }
+
+        switch range {
+        case .day:
+            return 24
+        case .week:
+            return 7
+        case .month:
+            return max(calendar.range(of: .day, in: .month, for: domain.start)?.count ?? 31, 1)
+        case .year:
+            return 12
+        }
+    }
+
+    private func barWidth(in width: CGFloat, count: Int) -> CGFloat {
+        let slotWidth = width / CGFloat(max(count, 1))
+        let preferredWidth = slotWidth * 0.62
+        let maximum: CGFloat = mode == .full ? 34 : 12
+        return min(maximum, max(2, preferredWidth))
     }
 
     private func barHeight(normalizedValue: Double, value: Double, maxHeight: CGFloat) -> CGFloat {
         guard value > 0 else { return 2 }
-        return max(4, maxHeight * CGFloat(normalizedValue))
+        return max(mode == .full ? 5 : 4, maxHeight * CGFloat(normalizedValue))
+    }
+
+    private func normalizedValue(_ value: Double, minimum: Double, maximum: Double) -> Double {
+        guard maximum > minimum else {
+            return 0
+        }
+
+        return min(max((value - minimum) / (maximum - minimum), 0), 1)
+    }
+
+    private func pointLocation(
+        for point: NumericMetricPoint,
+        domain: (start: Date, end: Date),
+        values: (minimum: Double, maximum: Double),
+        plotRect: CGRect
+    ) -> CGPoint {
+        CGPoint(
+            x: xPosition(for: point, domain: domain, plotRect: plotRect),
+            y: yPosition(for: point.value, values: values, plotRect: plotRect)
+        )
+    }
+
+    private func xPosition(
+        for point: NumericMetricPoint,
+        domain: (start: Date, end: Date),
+        plotRect: CGRect
+    ) -> CGFloat {
+        let fallbackDuration = fallbackSlotDuration(for: domain)
+        let duration = point.endDate?.timeIntervalSince(point.startDate) ?? fallbackDuration
+        let centerDate = point.startDate.addingTimeInterval(max(duration, fallbackDuration) / 2)
+        return xPosition(for: centerDate, domain: domain, plotRect: plotRect)
+    }
+
+    private func xPosition(
+        for date: Date,
+        domain: (start: Date, end: Date),
+        plotRect: CGRect
+    ) -> CGFloat {
+        let totalDuration = max(domain.end.timeIntervalSince(domain.start), 1)
+        let elapsed = min(max(date.timeIntervalSince(domain.start), 0), totalDuration)
+        return plotRect.minX + plotRect.width * CGFloat(elapsed / totalDuration)
+    }
+
+    private func yPosition(
+        for value: Double,
+        values: (minimum: Double, maximum: Double),
+        plotRect: CGRect
+    ) -> CGFloat {
+        let normalized = normalizedValue(value, minimum: values.minimum, maximum: values.maximum)
+        return plotRect.maxY - plotRect.height * CGFloat(normalized)
+    }
+
+    private func fallbackSlotDuration(for domain: (start: Date, end: Date)) -> TimeInterval {
+        let duration = max(domain.end.timeIntervalSince(domain.start), 1)
+        return duration / Double(max(expectedSlotCount(in: domain), 1))
+    }
+
+    private func xAxisTicks(in domain: (start: Date, end: Date)) -> [AxisTick] {
+        guard mode == .full else {
+            return []
+        }
+
+        guard let range else {
+            return [
+                AxisTick(label: DashboardFormatting.compactDayLabel(for: domain.start), date: domain.start),
+                AxisTick(label: DashboardFormatting.compactDayLabel(for: domain.end), date: domain.end)
+            ]
+        }
+
+        switch range {
+        case .day:
+            return [0, 6, 12, 18].compactMap { hour in
+                guard let date = calendar.date(byAdding: .hour, value: hour, to: domain.start) else { return nil }
+                let label = hour == 0 ? "12 AM" : hour == 12 ? "12 PM" : "\(hour % 12) \(hour < 12 ? "AM" : "PM")"
+                return AxisTick(label: label, date: date)
+            }
+        case .week:
+            let formatter = DateFormatter()
+            formatter.setLocalizedDateFormatFromTemplate("EEE")
+            formatter.calendar = calendar
+            return (0..<7).compactMap { offset in
+                guard let date = calendar.date(byAdding: .day, value: offset, to: domain.start) else { return nil }
+                return AxisTick(label: formatter.string(from: date), date: date)
+            }
+        case .month:
+            let days = [1, 8, 15, 22, 29]
+            return days.compactMap { day -> AxisTick? in
+                var components = calendar.dateComponents([.year, .month], from: domain.start)
+                components.day = day
+                guard let date = calendar.date(from: components), date < domain.end else {
+                    return nil
+                }
+                return AxisTick(label: "\(day)", date: date)
+            }
+        case .year:
+            let formatter = DateFormatter()
+            formatter.dateFormat = "LLLLL"
+            formatter.calendar = calendar
+            return (0..<12).compactMap { monthOffset in
+                guard let date = calendar.date(byAdding: .month, value: monthOffset, to: domain.start) else { return nil }
+                return AxisTick(label: formatter.string(from: date), date: date)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func axisLabels(
+        values: (minimum: Double, maximum: Double),
+        domain: (start: Date, end: Date),
+        plotRect: CGRect
+    ) -> some View {
+        let midpoint = values.minimum + (values.maximum - values.minimum) / 2
+        ForEach(
+            [
+                (axisLabel(values.maximum), plotRect.minY),
+                (axisLabel(midpoint), plotRect.minY + plotRect.height * 0.5),
+                (axisLabel(values.minimum), plotRect.maxY)
+            ],
+            id: \.0
+        ) { label, y in
+            Text(label)
+                .font(.caption.weight(.semibold).monospacedDigit())
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.72)
+                .position(x: plotRect.maxX + 26, y: y)
+        }
+
+        ForEach(xAxisTicks(in: domain)) { tick in
+            Text(tick.label)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.65)
+                .position(
+                    x: xPosition(for: tick.date, domain: domain, plotRect: plotRect),
+                    y: plotRect.maxY + 18
+                )
+        }
     }
 }
 

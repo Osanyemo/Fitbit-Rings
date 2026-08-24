@@ -161,6 +161,41 @@ final class FitnessDashboardStore {
         }
     }
 
+    func loadMetricChart(
+        _ type: GoogleHealthDataType,
+        range: MetricChartRange,
+        force: Bool = false
+    ) async {
+        guard type.supportsDetailedChartRollups else {
+            return
+        }
+
+        if !force, chartSeries(for: type, range: range) != nil {
+            return
+        }
+
+        guard beginRefresh(.activity) else { return }
+        defer { finishRefresh(.activity) }
+
+        setSection(.activity, phase: .loading, error: nil)
+
+        do {
+            snapshot = try await repository.refreshMetricChart(
+                type,
+                range: range,
+                preserving: snapshot,
+                date: snapshot.summary.date
+            )
+            setSection(.activity, phase: .loaded, lastUpdated: .now, error: nil)
+        } catch {
+            guard !error.isCancellation else {
+                setSection(.activity, phase: .idle, error: nil)
+                return
+            }
+            setSection(.activity, phase: .failed, error: error.localizedDescription)
+        }
+    }
+
     func route(to route: DashboardRoute) {
         let targetTab = targetTab(for: route)
         selectedTab = targetTab
@@ -180,6 +215,10 @@ final class FitnessDashboardStore {
     func series(for type: GoogleHealthDataType) -> NumericMetricSeries? {
         snapshot.activity.series(for: type)
             ?? snapshot.health.series(for: type)
+    }
+
+    func chartSeries(for type: GoogleHealthDataType, range: MetricChartRange) -> MetricChartSeries? {
+        snapshot.activity.chartSeries(for: type, range: range)
     }
 
     func workout(id: String) -> WorkoutDetail? {

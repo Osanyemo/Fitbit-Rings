@@ -224,6 +224,105 @@ struct NumericMetricSeries: Codable, Hashable, Identifiable, Sendable {
     }
 }
 
+enum MetricChartRange: String, CaseIterable, Codable, Hashable, Identifiable, Sendable {
+    case day
+    case week
+    case month
+    case year
+
+    var id: String { rawValue }
+
+    var shortTitle: String {
+        switch self {
+        case .day:
+            return "D"
+        case .week:
+            return "W"
+        case .month:
+            return "M"
+        case .year:
+            return "Y"
+        }
+    }
+
+    var title: String {
+        switch self {
+        case .day:
+            return "Day"
+        case .week:
+            return "Week"
+        case .month:
+            return "Month"
+        case .year:
+            return "Year"
+        }
+    }
+}
+
+enum MetricChartStyle: String, Codable, Hashable, Sendable {
+    case bar
+    case line
+}
+
+struct MetricChartSeries: Codable, Hashable, Identifiable, Sendable {
+    var id: String { "\(type.rawValue)-\(range.rawValue)" }
+    var type: GoogleHealthDataType
+    var range: MetricChartRange
+    var points: [NumericMetricPoint]
+    var rangeStart: Date?
+    var rangeEnd: Date?
+    var representedDayCount: Int?
+
+    init(
+        type: GoogleHealthDataType,
+        range: MetricChartRange,
+        points: [NumericMetricPoint] = [],
+        rangeStart: Date? = nil,
+        rangeEnd: Date? = nil,
+        representedDayCount: Int? = nil
+    ) {
+        self.type = type
+        self.range = range
+        self.points = points.sorted { $0.startDate < $1.startDate }
+        self.rangeStart = rangeStart
+        self.rangeEnd = rangeEnd
+        self.representedDayCount = representedDayCount
+    }
+
+    var totalValue: Double {
+        points.reduce(0) { $0 + $1.value }
+    }
+
+    var averageDailyValue: Double? {
+        guard range != .day else {
+            return nil
+        }
+
+        let denominator = representedDayCount ?? points.count
+        guard denominator > 0 else {
+            return nil
+        }
+
+        return totalValue / Double(denominator)
+    }
+
+    var rangeSubtitle: String {
+        guard let start = rangeStart, let end = rangeEnd else {
+            return range.title
+        }
+
+        switch range {
+        case .day:
+            return DashboardFormatting.compactDayLabel(for: start)
+        case .week, .month:
+            return DashboardFormatting.compactRangeLabel(start: start, end: end, treatsEndAsExclusive: true)
+        case .year:
+            let year = Calendar.current.component(.year, from: start)
+            return "\(year)"
+        }
+    }
+}
+
 struct MetricBucket: Codable, Hashable, Identifiable, Sendable {
     var id: String { label }
     var label: String
@@ -256,14 +355,56 @@ struct ActivityDashboardData: Codable, Equatable, Sendable {
     var dailySeries: [NumericMetricSeries]
     var hourlySeries: [NumericMetricSeries]
     var bucketedSeries: [BucketedMetricSeries]
+    var chartSeries: [MetricChartSeries]
     var loadedAt: Date?
 
     static let empty = ActivityDashboardData(
         dailySeries: [],
         hourlySeries: [],
         bucketedSeries: [],
+        chartSeries: [],
         loadedAt: nil
     )
+
+    init(
+        dailySeries: [NumericMetricSeries],
+        hourlySeries: [NumericMetricSeries],
+        bucketedSeries: [BucketedMetricSeries],
+        chartSeries: [MetricChartSeries] = [],
+        loadedAt: Date?
+    ) {
+        self.dailySeries = dailySeries
+        self.hourlySeries = hourlySeries
+        self.bucketedSeries = bucketedSeries
+        self.chartSeries = chartSeries
+        self.loadedAt = loadedAt
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case dailySeries
+        case hourlySeries
+        case bucketedSeries
+        case chartSeries
+        case loadedAt
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        dailySeries = try container.decodeIfPresent([NumericMetricSeries].self, forKey: .dailySeries) ?? []
+        hourlySeries = try container.decodeIfPresent([NumericMetricSeries].self, forKey: .hourlySeries) ?? []
+        bucketedSeries = try container.decodeIfPresent([BucketedMetricSeries].self, forKey: .bucketedSeries) ?? []
+        chartSeries = try container.decodeIfPresent([MetricChartSeries].self, forKey: .chartSeries) ?? []
+        loadedAt = try container.decodeIfPresent(Date.self, forKey: .loadedAt)
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(dailySeries, forKey: .dailySeries)
+        try container.encode(hourlySeries, forKey: .hourlySeries)
+        try container.encode(bucketedSeries, forKey: .bucketedSeries)
+        try container.encode(chartSeries, forKey: .chartSeries)
+        try container.encodeIfPresent(loadedAt, forKey: .loadedAt)
+    }
 
     func series(for type: GoogleHealthDataType) -> NumericMetricSeries? {
         dailySeries(for: type) ?? hourlySeries(for: type)
@@ -277,9 +418,14 @@ struct ActivityDashboardData: Codable, Equatable, Sendable {
         hourlySeries.first { $0.type == type }
     }
 
+    func chartSeries(for type: GoogleHealthDataType, range: MetricChartRange) -> MetricChartSeries? {
+        chartSeries.first { $0.type == type && $0.range == range }
+    }
+
     var isEmpty: Bool {
         !dailySeries.containsVisiblePoints
             && !hourlySeries.containsVisiblePoints
+            && !chartSeries.contains { !$0.points.isEmpty }
             && bucketedSeries.isEmpty
     }
 
@@ -289,6 +435,14 @@ struct ActivityDashboardData: Codable, Equatable, Sendable {
             return
         }
         dailySeries[index] = dailySeries[index].mergingEarlier(earlier)
+    }
+
+    mutating func upsertChartSeries(_ series: MetricChartSeries) {
+        if let index = chartSeries.firstIndex(where: { $0.type == series.type && $0.range == series.range }) {
+            chartSeries[index] = series
+        } else {
+            chartSeries.append(series)
+        }
     }
 }
 

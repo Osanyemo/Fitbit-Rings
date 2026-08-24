@@ -441,6 +441,92 @@ final class GoogleHealthDecodingTests: XCTestCase {
         XCTAssertEqual(distance.latestPoint?.value, 3_200)
     }
 
+    func testMetricChartMapperPreservesExplicitZeroAndOmitsMissingRollupWindows() throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+
+        let start = calendar.date(from: DateComponents(year: 2026, month: 8, day: 23))!
+        let secondHour = calendar.date(byAdding: .hour, value: 1, to: start)!
+        let displayRange = DateInterval(start: start, duration: 86_400)
+
+        let response = GoogleHealthRollUpResponse(
+            rollupDataPoints: [
+                GoogleHealthRollupDataPoint(
+                    startTime: start,
+                    endTime: secondHour,
+                    steps: GoogleHealthStepsRollup(countSum: GoogleHealthNumericValue(0))
+                ),
+                GoogleHealthRollupDataPoint(
+                    startTime: secondHour,
+                    endTime: calendar.date(byAdding: .hour, value: 2, to: start),
+                    steps: nil
+                )
+            ]
+        )
+
+        let chart = GoogleHealthMapper.mapChartSeries(
+            .steps,
+            range: .day,
+            response: response,
+            displayRange: displayRange,
+            calendar: calendar
+        )
+
+        XCTAssertEqual(chart.points.count, 1)
+        XCTAssertEqual(chart.points.first?.value, 0)
+        XCTAssertNil(chart.representedDayCount)
+    }
+
+    func testMetricChartMapperAggregatesYearIntoMonthlyBarsWithDailyAverageDenominator() throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+
+        let jan1 = calendar.date(from: DateComponents(year: 2026, month: 1, day: 1))!
+        let jan2 = calendar.date(from: DateComponents(year: 2026, month: 1, day: 2))!
+        let feb1 = calendar.date(from: DateComponents(year: 2026, month: 2, day: 1))!
+        let range = calendar.dateInterval(of: .year, for: jan1)!
+
+        let chart = GoogleHealthMapper.mapYearChartSeries(
+            .distance,
+            responses: [
+                GoogleHealthRollUpResponse(
+                    rollupDataPoints: [
+                        GoogleHealthRollupDataPoint(
+                            startTime: jan1,
+                            distance: GoogleHealthDistanceRollup(
+                                millimetersSum: GoogleHealthNumericValue(1_000)
+                            )
+                        ),
+                        GoogleHealthRollupDataPoint(
+                            startTime: jan2,
+                            distance: GoogleHealthDistanceRollup(
+                                millimetersSum: GoogleHealthNumericValue(0)
+                            )
+                        )
+                    ]
+                ),
+                GoogleHealthRollUpResponse(
+                    rollupDataPoints: [
+                        GoogleHealthRollupDataPoint(
+                            startTime: feb1,
+                            distance: GoogleHealthDistanceRollup(
+                                millimetersSum: GoogleHealthNumericValue(2_000)
+                            )
+                        )
+                    ]
+                )
+            ],
+            displayRange: range,
+            calendar: calendar
+        )
+
+        XCTAssertEqual(chart.range, .year)
+        XCTAssertEqual(chart.points.count, 2)
+        XCTAssertEqual(chart.points.map(\.value), [1, 2])
+        XCTAssertEqual(chart.representedDayCount, 3)
+        XCTAssertEqual(try XCTUnwrap(chart.averageDailyValue), 1, accuracy: 0.0001)
+    }
+
     func testActivityMapperUpsertsCurrentDayActiveCaloriesAndMinutes() throws {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(secondsFromGMT: 0)!
@@ -947,6 +1033,44 @@ final class GoogleHealthDecodingTests: XCTestCase {
             resolvingAgainstBaseURL: false
         )?.queryItems
         XCTAssertTrue(queryItems?.first(named: "filter")?.value?.contains("activity_level.date") == true)
+    }
+
+    func testGoogleHealthClientBuildsMetricChartRollupRequests() async throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+
+        let httpClient = CapturingHTTPClient()
+        let client = GoogleHealthClient(networkClient: httpClient, calendar: calendar)
+        let date = calendar.date(from: DateComponents(year: 2026, month: 8, day: 20, hour: 12))!
+
+        _ = try await client.fetchMetricChartSeries(.steps, range: .day, anchorDate: date)
+
+        let request = try XCTUnwrap(httpClient.recordedRequests().first)
+        XCTAssertEqual(request.url?.path, "/v4/users/me/dataTypes/steps/dataPoints:rollUp")
+
+        let body = String(data: try XCTUnwrap(request.httpBody), encoding: .utf8)
+        let expectedStartTime = ISO8601DateFormatter.googleHealth.string(from: calendar.startOfDay(for: date))
+        let expectedEndTime = ISO8601DateFormatter.googleHealth.string(from: date)
+        XCTAssertTrue(body?.contains("\"windowSize\":\"3600s\"") == true)
+        XCTAssertTrue(body?.contains("\"startTime\":\"\(expectedStartTime)\"") == true)
+        XCTAssertTrue(body?.contains("\"endTime\":\"\(expectedEndTime)\"") == true)
+    }
+
+    func testGoogleHealthClientChunksYearlyMetricChartRollupsByRangeLimit() async throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+
+        let httpClient = CapturingHTTPClient()
+        let client = GoogleHealthClient(networkClient: httpClient, calendar: calendar)
+        let date = calendar.date(from: DateComponents(year: 2026, month: 8, day: 20, hour: 12))!
+
+        _ = try await client.fetchMetricChartSeries(.distance, range: .year, anchorDate: date)
+
+        let requests = httpClient.recordedRequests()
+        XCTAssertEqual(requests.count, 5)
+        XCTAssertTrue(
+            requests.allSatisfy { $0.url?.path == "/v4/users/me/dataTypes/distance/dataPoints:dailyRollUp" }
+        )
     }
 
     func testReconcilePaginationIncludesPageTokenAndExerciseLimit() async throws {

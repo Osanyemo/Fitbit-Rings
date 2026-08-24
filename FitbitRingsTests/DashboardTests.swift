@@ -701,6 +701,23 @@ final class DashboardTests: XCTestCase {
         XCTAssertEqual(series.displayBuckets.map(\.value), [218, 82, 123])
     }
 
+    func testActivityDashboardDataDecodesLegacyPayloadWithoutChartSeries() throws {
+        let json = """
+        {
+          "dailySeries": [],
+          "hourlySeries": [],
+          "bucketedSeries": []
+        }
+        """
+
+        let decoded = try JSONDecoder().decode(ActivityDashboardData.self, from: Data(json.utf8))
+
+        XCTAssertTrue(decoded.dailySeries.isEmpty)
+        XCTAssertTrue(decoded.hourlySeries.isEmpty)
+        XCTAssertTrue(decoded.bucketedSeries.isEmpty)
+        XCTAssertTrue(decoded.chartSeries.isEmpty)
+    }
+
     @MainActor
     func testRefreshSummarySeedsMeasuredHeartRateIntoHealthSeries() async throws {
         let measuredAt = Date(timeIntervalSince1970: 1_500)

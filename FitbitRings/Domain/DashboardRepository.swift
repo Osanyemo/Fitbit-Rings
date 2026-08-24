@@ -157,6 +157,24 @@ struct DashboardRepository {
         return snapshot
     }
 
+    func refreshMetricChart(
+        _ type: GoogleHealthDataType,
+        range: MetricChartRange,
+        preserving cachedSnapshot: FitnessDataSnapshot,
+        date: Date = .now
+    ) async throws -> FitnessDataSnapshot {
+        let chartSeries = try await googleHealthClient.fetchMetricChartSeries(
+            type,
+            range: range,
+            anchorDate: date
+        )
+        var snapshot = cachedSnapshot
+        snapshot.activity.upsertChartSeries(chartSeries)
+        snapshot.lastUpdated = .now
+        cache.saveActivityData(snapshot.activity)
+        return snapshot
+    }
+
     func clearHealthData() {
         cache.clearHealthData()
     }

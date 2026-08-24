@@ -6,6 +6,11 @@ protocol GoogleHealthServing {
     func fetchWorkoutData(date: Date) async throws -> [WorkoutDetail]
     func fetchHealthData(date: Date) async throws -> HealthDashboardData
     func fetchEarlierMetricSeries(_ type: GoogleHealthDataType, before: Date) async throws -> NumericMetricSeries
+    func fetchMetricChartSeries(
+        _ type: GoogleHealthDataType,
+        range: MetricChartRange,
+        anchorDate: Date
+    ) async throws -> MetricChartSeries
 }
 
 extension GoogleHealthServing {
@@ -23,6 +28,14 @@ extension GoogleHealthServing {
 
     func fetchEarlierMetricSeries(_ type: GoogleHealthDataType, before: Date) async throws -> NumericMetricSeries {
         NumericMetricSeries(type: type, rangeEnd: before)
+    }
+
+    func fetchMetricChartSeries(
+        _ type: GoogleHealthDataType,
+        range: MetricChartRange,
+        anchorDate: Date
+    ) async throws -> MetricChartSeries {
+        MetricChartSeries(type: type, range: range, rangeStart: anchorDate, rangeEnd: anchorDate)
     }
 }
 
@@ -160,6 +173,48 @@ final class GoogleHealthClient: GoogleHealthServing {
         case .reconcile:
             let response = try await reconcileAll(type, interval: range)
             return GoogleHealthMapper.metricSeries(type, from: response.dataPoints, range: range, calendar: calendar)
+        }
+    }
+
+    func fetchMetricChartSeries(
+        _ type: GoogleHealthDataType,
+        range: MetricChartRange,
+        anchorDate: Date
+    ) async throws -> MetricChartSeries {
+        guard type.supportsDetailedChartRollups else {
+            return MetricChartSeries(type: type, range: range, rangeStart: anchorDate, rangeEnd: anchorDate)
+        }
+
+        let interval = metricChartInterval(range: range, endingAt: anchorDate)
+
+        switch range {
+        case .day:
+            let response = try await rollUpAll(type, interval: interval, windowSize: "3600s")
+            let displayInterval = dayInterval(for: anchorDate)
+            return GoogleHealthMapper.mapChartSeries(
+                type,
+                range: range,
+                response: response,
+                displayRange: displayInterval,
+                calendar: calendar
+            )
+        case .week, .month:
+            let response = try await dailyRollUpAll(type, interval: interval)
+            return GoogleHealthMapper.mapChartSeries(
+                type,
+                range: range,
+                response: response,
+                displayRange: interval,
+                calendar: calendar
+            )
+        case .year:
+            let responses = try await dailyRollupsByRangeLimit(type, interval: interval)
+            return GoogleHealthMapper.mapYearChartSeries(
+                type,
+                responses: responses,
+                displayRange: interval,
+                calendar: calendar
+            )
         }
     }
 
@@ -345,6 +400,46 @@ final class GoogleHealthClient: GoogleHealthServing {
 
     private func recentInterval(days: Int, endingAt date: Date) -> DateInterval {
         DateInterval(start: calendar.date(byAdding: .day, value: -days, to: date) ?? date, end: date)
+    }
+
+    private func metricChartInterval(range: MetricChartRange, endingAt date: Date) -> DateInterval {
+        switch range {
+        case .day:
+            let day = dayInterval(for: date)
+            return DateInterval(start: day.start, end: min(date, day.end))
+        case .week:
+            return calendar.dateInterval(of: .weekOfYear, for: date) ?? dailyRollupInterval(days: 7, endingAt: date)
+        case .month:
+            return calendar.dateInterval(of: .month, for: date) ?? dailyRollupInterval(days: 31, endingAt: date)
+        case .year:
+            return calendar.dateInterval(of: .year, for: date) ?? dailyRollupInterval(days: 365, endingAt: date)
+        }
+    }
+
+    private func dailyRollupsByRangeLimit(
+        _ dataType: GoogleHealthDataType,
+        interval: DateInterval
+    ) async throws -> [GoogleHealthRollUpResponse] {
+        var responses: [GoogleHealthRollUpResponse] = []
+        var chunkStart = interval.start
+        let limitDays = dataType.dailyRollupRangeLimitDays
+
+        while chunkStart < interval.end {
+            guard let proposedEnd = calendar.date(byAdding: .day, value: limitDays, to: chunkStart) else {
+                break
+            }
+
+            let chunkEnd = min(proposedEnd, interval.end)
+            guard chunkStart < chunkEnd else {
+                break
+            }
+
+            let chunk = DateInterval(start: chunkStart, end: chunkEnd)
+            responses.append(try await dailyRollUpAll(dataType, interval: chunk))
+            chunkStart = chunkEnd
+        }
+
+        return responses
     }
 
     private func physicalTimeInterval(for interval: DateInterval) -> GoogleHealthPhysicalTimeInterval {

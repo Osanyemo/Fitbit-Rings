@@ -455,4 +455,17 @@ extension GoogleHealthDataType {
     var isPageLimitedToTwentyFive: Bool {
         self == .exercise || self == .sleep
     }
+
+    var supportsDetailedChartRollups: Bool {
+        self == .steps || self == .distance
+    }
+
+    var dailyRollupRangeLimitDays: Int {
+        switch self {
+        case .activeMinutes, .totalCalories, .caloriesInHeartRateZone, .heartRate:
+            return 14
+        default:
+            return 90
+        }
+    }
 }
